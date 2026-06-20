@@ -83,12 +83,7 @@ fn parse_subtable(subtable: CmapSubtable<'_>, offset: usize) -> Value {
                 ),
                 (
                     "glyphIdArray",
-                    parsed_array(
-                        "uint8[]",
-                        table.glyph_id_array().to_vec(),
-                        offset + 6,
-                        256,
-                    ),
+                    parsed_array("uint8[]", table.glyph_id_array().to_vec(), offset + 6, 256),
                 ),
             ],
         ),
@@ -255,12 +250,7 @@ fn parse_subtable(subtable: CmapSubtable<'_>, offset: usize) -> Value {
                     ),
                     (
                         "is32",
-                        parsed_array(
-                            "uint8[]",
-                            table.is32().to_vec(),
-                            offset + 12,
-                            8192,
-                        ),
+                        parsed_array("uint8[]", table.is32().to_vec(), offset + 12, 8192),
                     ),
                     (
                         "numGroups",
