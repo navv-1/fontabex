@@ -2,6 +2,8 @@
 
 OpenType font table explorer built with Tauri, Svelte, TypeScript, and Rust.
 
+![Fontabex showing parsed OpenType table data](docs/screenshot.png)
+
 Fontabex opens local `.ttf` and `.otf` files, lists their OpenType tables, and shows parsed table data alongside the raw hex bytes. It is intended as a focused inspection tool for font internals rather than a font editor.
 
 ## Features
