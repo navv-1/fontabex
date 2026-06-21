@@ -29,6 +29,7 @@
 
 <header class="toolbar">
   <div class="toolbar-left">
+    <img src="/logo.png" alt="Fontabex" width="24" height="24" />
     <button
       class="button button-outline open-font-btn"
       type="button"

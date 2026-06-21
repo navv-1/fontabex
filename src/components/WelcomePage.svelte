@@ -73,6 +73,7 @@
     <div class="welcome-content">
       <!-- App branding -->
       <div class="branding">
+        <img src="/logo.png" alt="Fontabex" width="32" height="32" />
         <h1 class="app-title">fontabex</h1>
         <p class="app-tagline">Explore OpenType font tables</p>
       </div>
