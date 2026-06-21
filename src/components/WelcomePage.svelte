@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { showTitlebarContextMenu } from "../lib/titlebarContextMenu";
   import WindowControls from "./WindowControls.svelte";
 
   interface Props {
@@ -21,7 +22,8 @@
 </script>
 
 <div class="welcome-shell">
-  <header class="welcome-header">
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <header class="welcome-header" oncontextmenu={showTitlebarContextMenu}>
     <div class="welcome-drag-region" data-tauri-drag-region></div>
     <button
       class="button button-outline button-icon theme-toggle"

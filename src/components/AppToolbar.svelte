@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { FontTableInfo } from "../lib/fontTables";
+  import { showTitlebarContextMenu } from "../lib/titlebarContextMenu";
   import WindowControls from "./WindowControls.svelte";
 
   interface Props {
@@ -27,7 +28,8 @@
   }: Props = $props();
 </script>
 
-<header class="toolbar">
+<!-- svelte-ignore a11y_no_static_element_interactions -->
+<header class="toolbar" oncontextmenu={showTitlebarContextMenu}>
   <div class="toolbar-left">
     <img src="/logo.png" alt="Fontabex" width="24" height="24" />
     <button
