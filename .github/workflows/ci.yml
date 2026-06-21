@@ -42,7 +42,7 @@ jobs:
         run: npm run build
 
       - name: Check Rust formatting
-        run: npm run format:rust:check
+        run: npm run format:check:rust
 
       - name: Check Rust
-        run: cargo check --manifest-path src-tauri/Cargo.toml
+        run: npm run check:rust

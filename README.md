@@ -79,8 +79,7 @@ npm run check
 Check the Rust backend:
 
 ```sh
-cd src-tauri
-cargo check
+npm run check:rust
 ```
 
 Format frontend and shared web assets:
@@ -104,7 +103,7 @@ npm run format:rust
 Check Rust formatting:
 
 ```sh
-npm run format:rust:check
+npm run format:check:rust
 ```
 
 Build the frontend:

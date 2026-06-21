@@ -12,6 +12,6 @@ if ! command -v cargo >/dev/null 2>&1; then
 fi
 
 npm run check
+npm run check:rust
 npm run format:check
-npm run format:rust:check
-cargo check --manifest-path src-tauri/Cargo.toml
+npm run format:check:rust
