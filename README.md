@@ -118,6 +118,23 @@ Build the desktop app:
 npm run tauri build
 ```
 
+## Versioning
+
+Fontabex uses SemVer. While the app is pre-1.0, use patch releases for fixes
+and minor releases for new user-facing features or newly parsed tables.
+
+Keep the app version synchronized across `package.json`, `package-lock.json`,
+`src-tauri/Cargo.toml`, and `src-tauri/tauri.conf.json` by running one of:
+
+```sh
+npm run version:patch
+npm run version:minor
+npm run version:major
+```
+
+The version bump script requires a clean working tree. Release tags should use
+the `vX.Y.Z` format, for example `v0.2.0`.
+
 ## Project Layout
 
 ```text

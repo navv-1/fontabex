@@ -14,7 +14,10 @@
     "format:check": "prettier --check .",
     "format:rust": "cargo fmt --manifest-path src-tauri/Cargo.toml",
     "format:check:rust": "cargo fmt --manifest-path src-tauri/Cargo.toml -- --check",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "version:patch": "node scripts/bump-version.mjs patch",
+    "version:minor": "node scripts/bump-version.mjs minor",
+    "version:major": "node scripts/bump-version.mjs major"
   },
   "license": "GPL-3.0-only",
   "dependencies": {
