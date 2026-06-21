@@ -20,7 +20,7 @@ pub fn parse(font: &FontRef<'_>) -> Result<Value, String> {
         .iter()
         .enumerate()
         .map(|(index, side_bearing)| {
-            parsed_field("FWORD", side_bearing.get(), h_metrics_length + index * 2, 2)
+            parsed_field("FWord", side_bearing.get(), h_metrics_length + index * 2, 2)
         })
         .collect::<Vec<_>>();
 
@@ -32,7 +32,7 @@ pub fn parse(font: &FontRef<'_>) -> Result<Value, String> {
             "length": h_metrics_length
         },
         "leftSideBearings": {
-            "type": "FWORD[]",
+            "type": "FWord[]",
             "value": left_side_bearings,
             "offset": h_metrics_length,
             "length": table.left_side_bearings().len() * 2
@@ -43,8 +43,8 @@ pub fn parse(font: &FontRef<'_>) -> Result<Value, String> {
 fn parse_long_metric(index: usize, metric: &LongMetric) -> Value {
     let offset = index * LongMetric::RAW_BYTE_LEN;
     json!({
-        "advanceWidth": parsed_field("UFWORD", metric.advance(), offset, 2),
-        "lsb": parsed_field("FWORD", metric.side_bearing(), offset + 2, 2)
+        "advanceWidth": parsed_field("UfWord", metric.advance(), offset, 2),
+        "lsb": parsed_field("FWord", metric.side_bearing(), offset + 2, 2)
     })
 }
 
