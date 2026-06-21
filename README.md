@@ -12,7 +12,7 @@ Fontabex opens local `.ttf` and `.otf` files, lists their OpenType tables, and s
 - Browse the table directory with table tags, offsets, lengths, and sizes.
 - Inspect parsed table fields with data types, offsets, lengths, values, nested arrays, and records.
 - Search parsed data by index, all columns, or specific columns.
-- Resize parsed-data columns.
+- Resize parsed-data columns (double-click the resize handle to reset).
 - View raw table bytes in a synchronized hex pane.
 - Click parsed fields to highlight and scroll to the corresponding byte range.
 - Open links to the relevant OpenType specification pages.
