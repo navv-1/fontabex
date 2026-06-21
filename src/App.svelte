@@ -636,10 +636,7 @@
         const key = colWidthKey(id);
         const measured =
           headerCells[index]?.getBoundingClientRect().width ?? colMin(id);
-        widths[key] = Math.max(
-          colMin(id),
-          parsedColumnWidths[key] ?? measured,
-        );
+        widths[key] = Math.max(colMin(id), parsedColumnWidths[key] ?? measured);
         return widths;
       },
       {},
