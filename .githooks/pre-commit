@@ -1,0 +1,17 @@
+#!/bin/sh
+set -e
+
+if ! command -v npm >/dev/null 2>&1; then
+  echo "pre-commit: npm is required but was not found on PATH." >&2
+  exit 1
+fi
+
+if ! command -v cargo >/dev/null 2>&1; then
+  echo "pre-commit: cargo is required but was not found on PATH." >&2
+  exit 1
+fi
+
+npm run check
+npm run format:check
+npm run format:rust:check
+cargo check --manifest-path src-tauri/Cargo.toml
