@@ -638,7 +638,7 @@
           headerCells[index]?.getBoundingClientRect().width ?? colMin(id);
         widths[key] = Math.max(
           colMin(id),
-          Math.round(parsedColumnWidths[key] ?? measured),
+          parsedColumnWidths[key] ?? measured,
         );
         return widths;
       },
