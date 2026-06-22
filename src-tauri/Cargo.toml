@@ -1,6 +1,6 @@
 [package]
 name = "fontabex"
-version = "0.1.0"
+version = "0.2.0"
 description = "Explore OpenType font tables."
 authors = ["Herlan"]
 license = "GPL-3.0-only"
