@@ -23,6 +23,7 @@ Fontabex opens local `.ttf` and `.otf` files, lists their OpenType tables, and s
 The Rust parser currently has structured parsers for:
 
 - Table Directory
+- `avar`
 - `cmap`
 - `fvar`
 - `head`

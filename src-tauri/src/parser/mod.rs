@@ -1,6 +1,7 @@
 use read_fonts::FontRef;
 use serde_json::Value;
 
+pub mod avar;
 pub mod cmap;
 pub mod fvar;
 pub mod head;
@@ -13,6 +14,7 @@ pub mod post;
 pub mod reader;
 pub mod stat;
 pub mod table_directory;
+pub mod variations;
 
 #[tauri::command]
 pub fn parse_specific_table(path: String, tag: String) -> Result<Value, String> {
@@ -29,6 +31,7 @@ pub fn parse_specific_table(path: String, tag: String) -> Result<Value, String> 
         "post" => post::parse(&font),
         "name" => name::parse(&font),
         "cmap" => cmap::parse(&font),
+        "avar" => avar::parse(&font),
         "fvar" => fvar::parse(&font),
         "STAT" => stat::parse(&font),
         _ => Err(format!(
