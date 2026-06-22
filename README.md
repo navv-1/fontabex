@@ -32,6 +32,7 @@ The Rust parser currently has structured parsers for:
 - `name`
 - `OS/2`
 - `post`
+- `STAT`
 
 Other tables are still listed in the directory and can be inspected through their raw bytes, but structured parsing is added table by table.
 

@@ -11,6 +11,7 @@ pub mod name;
 pub mod os2;
 pub mod post;
 pub mod reader;
+pub mod stat;
 pub mod table_directory;
 
 #[tauri::command]
@@ -29,6 +30,7 @@ pub fn parse_specific_table(path: String, tag: String) -> Result<Value, String> 
         "name" => name::parse(&font),
         "cmap" => cmap::parse(&font),
         "fvar" => fvar::parse(&font),
+        "STAT" => stat::parse(&font),
         _ => Err(format!(
             "Parsing for table '{}' is not implemented yet.",
             tag
