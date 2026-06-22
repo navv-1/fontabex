@@ -2,6 +2,7 @@ use read_fonts::FontRef;
 use serde_json::Value;
 
 pub mod cmap;
+pub mod fvar;
 pub mod head;
 pub mod hhea;
 pub mod hmtx;
@@ -27,6 +28,7 @@ pub fn parse_specific_table(path: String, tag: String) -> Result<Value, String> 
         "post" => post::parse(&font),
         "name" => name::parse(&font),
         "cmap" => cmap::parse(&font),
+        "fvar" => fvar::parse(&font),
         _ => Err(format!(
             "Parsing for table '{}' is not implemented yet.",
             tag

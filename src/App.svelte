@@ -515,6 +515,14 @@
     return columns;
   });
 
+  function getParsedObjectColumnType(column: string) {
+    for (const row of currentParsedObjectRows) {
+      const value = row[column];
+      if (isParsedField(value) && value.type) return String(value.type);
+    }
+    return "";
+  }
+
   let currentParsedObjectHasKeys = $derived.by(() => {
     return currentParsedObjectRows.some(
       (row) => typeof row.name === "string" && row.name.length > 0,
@@ -536,7 +544,9 @@
     !currentParsedPageIsArray || currentParsedEntriesHaveNames,
   );
 
-  let currentParsedShowsTypeColumn = $derived(!currentParsedPageIsArray);
+  let currentParsedShowsTypeColumn = $derived(
+    !currentParsedPageIsArray || Boolean(currentParsedArrayItemType),
+  );
 
   const COL_MIN = 64;
   const COL_FLEX = "1fr";
@@ -1218,11 +1228,19 @@
                     {#each currentParsedObjectColumns as column}
                       {@const columnLabel =
                         formatParsedSearchColumnLabel(column)}
+                      {@const columnType = getParsedObjectColumnType(column)}
                       <div
                         class="virtual-data-cell resizable-column-header"
                         role="columnheader"
                       >
-                        <span class="column-header-label">{columnLabel}</span>
+                        <span class="column-header-stack">
+                          <span class="column-header-label">{columnLabel}</span>
+                          {#if columnType}
+                            <span class="column-header-type">
+                              {columnType}
+                            </span>
+                          {/if}
+                        </span>
                         <button
                           class="column-resize-handle {resizingParsedColumn ===
                           `column:${column}`

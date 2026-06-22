@@ -1,6 +1,6 @@
 use super::reader::Reader;
 use encoding_rs::{BIG5, EUC_KR, GBK, MACINTOSH, SHIFT_JIS, UTF_16BE, WINDOWS_1252};
-use read_fonts::{tables::name::NameRecord, FontRef, TableProvider};
+use read_fonts::{tables::name::NameRecord, types::NameId, FontRef, TableProvider};
 use serde_json::{json, Value};
 
 pub fn parse(font: &FontRef<'_>) -> Result<Value, String> {
@@ -123,7 +123,7 @@ fn parse_name_record(
     );
 
     let mut name_id = reader.read_as(record.name_id().to_u16(), 2, "NameId");
-    add_summary(&mut name_id, name_id_label(record.name_id().to_u16()));
+    add_summary(&mut name_id, name_id_label(record.name_id()));
 
     let length = reader.read(record.length(), 2);
     let string_offset = reader.read_as(record.string_offset().to_u32(), 2, "Offset16");
@@ -345,34 +345,35 @@ fn windows_language_label(language_id: u16) -> Option<&'static str> {
     }
 }
 
-fn name_id_label(name_id: u16) -> Option<String> {
+pub fn name_id_label(name_id: NameId) -> Option<String> {
     let label = match name_id {
-        0 => "Copyright notice",
-        1 => "Font Family name",
-        2 => "Font Subfamily name",
-        3 => "Unique font identifier",
-        4 => "Full font name",
-        5 => "Version string",
-        6 => "PostScript name",
-        7 => "Trademark",
-        8 => "Manufacturer name",
-        9 => "Designer",
-        10 => "Description",
-        11 => "Vendor URL",
-        12 => "Designer URL",
-        13 => "License description",
-        14 => "License info URL",
-        16 => "Typographic Family name",
-        17 => "Typographic Subfamily name",
-        18 => "Compatible Full name",
-        19 => "Sample text",
-        20 => "PostScript CID findfont name",
-        21 => "WWS Family name",
-        22 => "WWS Subfamily name",
-        23 => "Light background palette",
-        24 => "Dark background palette",
-        25 => "Variations PostScript name prefix",
+        NameId::COPYRIGHT_NOTICE => "Copyright notice",
+        NameId::FAMILY_NAME => "Font Family name",
+        NameId::SUBFAMILY_NAME => "Font Subfamily name",
+        NameId::UNIQUE_ID => "Unique font identifier",
+        NameId::FULL_NAME => "Full font name",
+        NameId::VERSION_STRING => "Version string",
+        NameId::POSTSCRIPT_NAME => "PostScript name",
+        NameId::TRADEMARK => "Trademark",
+        NameId::MANUFACTURER => "Manufacturer name",
+        NameId::DESIGNER => "Designer",
+        NameId::DESCRIPTION => "Description",
+        NameId::VENDOR_URL => "Vendor URL",
+        NameId::DESIGNER_URL => "Designer URL",
+        NameId::LICENSE_DESCRIPTION => "License description",
+        NameId::LICENSE_URL => "License info URL",
+        NameId::TYPOGRAPHIC_FAMILY_NAME => "Typographic Family name",
+        NameId::TYPOGRAPHIC_SUBFAMILY_NAME => "Typographic Subfamily name",
+        NameId::COMPATIBLE_FULL_NAME => "Compatible Full name",
+        NameId::SAMPLE_TEXT => "Sample text",
+        NameId::POSTSCRIPT_CID_NAME => "PostScript CID findfont name",
+        NameId::WWS_FAMILY_NAME => "WWS Family name",
+        NameId::WWS_SUBFAMILY_NAME => "WWS Subfamily name",
+        NameId::LIGHT_BACKGROUND_PALETTE => "Light background palette",
+        NameId::DARK_BACKGROUND_PALETTE => "Dark background palette",
+        NameId::VARIATIONS_POSTSCRIPT_NAME_PREFIX => "Variations PostScript name prefix",
         _ => return None,
     };
-    Some(format!("{name_id} ({label})"))
+    let name_id_u16 = name_id.to_u16();
+    Some(format!("{name_id_u16} ({label})"))
 }

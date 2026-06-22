@@ -9,14 +9,15 @@ pub fn parse(font: &FontRef<'_>) -> Result<Value, String> {
     let mut t = Reader::new();
 
     Ok(json!({
-        "version": t.read_as(table.version().to_string(), 4, "MajorMinor"),
-        "fontRevision": t.read_as(table.font_revision().to_string(), 4, "Fixed"),
+        "majorVersion": t.read_as(table.version().major, 2, "uint16"),
+        "minorVersion": t.read_as(table.version().minor, 2, "uint16"),
+        "fontRevision": t.read_as(table.font_revision().to_f64(), 4, "Fixed"),
         "checksumAdjustment": t.read(table.checksum_adjustment(), 4),
         "magicNumber": t.read(format!("0x{:08X}", table.magic_number()), 4),
         "flags": t.read_as(format_head_flags(raw_head_flags(&table)?), 2, "uint16"),
         "unitsPerEm": t.read(table.units_per_em(), 2),
-        "created": t.read_as(format_head_long_date_time(&table, table.created_byte_range())?, 8, "LongDateTime"),
-        "modified": t.read_as(format_head_long_date_time(&table, table.modified_byte_range())?, 8, "LongDateTime"),
+        "created": t.read_as(format_head_long_date_time(&table, table.created_byte_range())?, 8, "LONGDATETIME"),
+        "modified": t.read_as(format_head_long_date_time(&table, table.modified_byte_range())?, 8, "LONGDATETIME"),
         "xMin": t.read(table.x_min(), 2),
         "yMin": t.read(table.y_min(), 2),
         "xMax": t.read(table.x_max(), 2),
@@ -82,10 +83,10 @@ fn raw_head_long_date_time(
     let bytes = table.min_table_bytes();
     let date_bytes = bytes
         .get(range)
-        .ok_or_else(|| "head LongDateTime byte range is outside the table".to_string())?;
+        .ok_or_else(|| "head LONGDATETIME byte range is outside the table".to_string())?;
     date_bytes
         .try_into()
-        .map_err(|_| "head LongDateTime field is not 8 bytes".to_string())
+        .map_err(|_| "head LONGDATETIME field is not 8 bytes".to_string())
 }
 
 fn long_date_time_parts(secs_since_1904: i64) -> DateTimeParts {

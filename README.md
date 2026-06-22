@@ -24,6 +24,7 @@ The Rust parser currently has structured parsers for:
 
 - Table Directory
 - `cmap`
+- `fvar`
 - `head`
 - `hhea`
 - `hmtx`

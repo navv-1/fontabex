@@ -17,11 +17,11 @@ pub fn parse(font: &FontRef<'_>) -> Result<Value, String> {
     );
     fields.insert(
         "underlinePosition".into(),
-        t.read_as(table.underline_position().to_i16(), 2, "FWord"),
+        t.read_as(table.underline_position(), 2, "FWORD"),
     );
     fields.insert(
         "underlineThickness".into(),
-        t.read_as(table.underline_thickness().to_i16(), 2, "FWord"),
+        t.read_as(table.underline_thickness(), 2, "FWORD"),
     );
     fields.insert("isFixedPitch".into(), t.read(table.is_fixed_pitch(), 4));
     fields.insert("minMemType42".into(), t.read(table.min_mem_type42(), 4));

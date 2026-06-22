@@ -535,7 +535,7 @@ body {
   padding: 0 0.75rem;
   border-bottom: 1px solid
     color-mix(in srgb, var(--border-color) 40%, transparent);
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -545,7 +545,7 @@ body {
   position: relative;
   line-height: 40px;
   font-size: 0.75rem;
-  font-weight: 700;
+  font-weight: 600;
   text-transform: uppercase;
   color: color-mix(in srgb, var(--text-color) 50%, transparent);
 }
@@ -555,6 +555,29 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.column-header-stack {
+  display: inline-flex;
+  min-width: 0;
+  max-width: 100%;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  line-height: 1.1;
+  vertical-align: middle;
+}
+
+.column-header-type {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: color-mix(in srgb, var(--text-color) 42%, transparent);
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  font-weight: 500;
+  text-transform: none;
 }
 
 .column-resize-handle {
@@ -832,6 +855,11 @@ th.col-val {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+}
+
+.parsed-pane > .virtual-data-grid {
+  flex: 1;
+  min-height: 0;
 }
 
 .split-resizer {
