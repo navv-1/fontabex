@@ -5,6 +5,13 @@ updates:
     schedule:
       interval: "weekly"
     groups:
+      svelte-vite-major:
+        patterns:
+          - "svelte"
+          - "@sveltejs/vite-plugin-svelte"
+          - "vite"
+        update-types:
+          - "major"
       npm-minor-patch:
         update-types:
           - "minor"
