@@ -17,6 +17,9 @@ pub mod reader;
 pub mod stat;
 pub mod table_directory;
 pub mod variations;
+pub mod vhea;
+pub mod vmtx;
+pub mod vvar;
 
 #[tauri::command]
 pub fn parse_specific_table(path: String, tag: String) -> Result<Value, String> {
@@ -30,6 +33,9 @@ pub fn parse_specific_table(path: String, tag: String) -> Result<Value, String> 
         "Table Directory" => table_directory::parse(&font),
         "hhea" => hhea::parse(&font),
         "hmtx" => hmtx::parse(&font),
+        "vhea" => vhea::parse(&font),
+        "vmtx" => vmtx::parse(&font),
+        "VVAR" => vvar::parse(&font),
         "post" => post::parse(&font),
         "name" => name::parse(&font),
         "cmap" => cmap::parse(&font),

@@ -36,6 +36,9 @@ The Rust parser currently has structured parsers for:
 - `OS/2`
 - `post`
 - `STAT`
+- `vhea`
+- `vmtx`
+- `VVAR`
 
 Other tables are still listed in the directory and can be inspected through their raw bytes, but structured parsing is added table by table.
 
