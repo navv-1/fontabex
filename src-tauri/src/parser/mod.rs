@@ -7,6 +7,7 @@ pub mod fvar;
 pub mod head;
 pub mod hhea;
 pub mod hmtx;
+pub mod hvar;
 pub mod maxp;
 pub mod mvar;
 pub mod name;
@@ -34,6 +35,7 @@ pub fn parse_specific_table(path: String, tag: String) -> Result<Value, String> 
         "cmap" => cmap::parse(&font),
         "avar" => avar::parse(&font),
         "fvar" => fvar::parse(&font),
+        "HVAR" => hvar::parse(&font),
         "MVAR" => mvar::parse(&font),
         "STAT" => stat::parse(&font),
         _ => Err(format!(

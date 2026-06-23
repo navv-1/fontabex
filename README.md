@@ -29,7 +29,9 @@ The Rust parser currently has structured parsers for:
 - `head`
 - `hhea`
 - `hmtx`
+- `HVAR`
 - `maxp`
+- `MVAR`
 - `name`
 - `OS/2`
 - `post`
