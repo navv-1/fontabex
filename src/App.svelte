@@ -852,7 +852,7 @@
   function navigateParsedValue(
     keyName: string,
     data: any,
-    arrayItemType?: string,
+    arrayItemType: string | undefined = undefined,
   ) {
     parsedPageStack = [...parsedPageStack, { keyName, data, arrayItemType }];
   }

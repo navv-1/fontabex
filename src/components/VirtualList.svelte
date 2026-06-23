@@ -109,7 +109,7 @@
   async function refresh(
     items: any[],
     viewport_height: number,
-    itemHeight?: number,
+    itemHeight: number | undefined = undefined,
   ) {
     if (!viewport || !contents) return;
     const currentScrollTop = viewport.scrollTop;
