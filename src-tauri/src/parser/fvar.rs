@@ -1,4 +1,7 @@
-use super::{name::name_id_label, reader::Reader};
+use super::{
+    name::name_id_label,
+    reader::{parsed_field, read_u16_at, Reader},
+};
 use read_fonts::{
     tables::fvar::{InstanceRecord, VariationAxisRecord},
     types::NameId,
@@ -190,28 +193,6 @@ fn parse_instance(
     }
 
     Value::Object(fields)
-}
-
-fn parsed_field<T: serde::Serialize>(
-    data_type: &'static str,
-    value: T,
-    offset: usize,
-    length: usize,
-) -> Value {
-    json!({
-        "type": data_type,
-        "value": value,
-        "offset": offset,
-        "length": length
-    })
-}
-
-fn read_u16_at(bytes: &[u8], offset: usize) -> u16 {
-    bytes
-        .get(offset..offset + 2)
-        .and_then(|bytes| bytes.try_into().ok())
-        .map(u16::from_be_bytes)
-        .unwrap_or_default()
 }
 
 fn name_id_field(name_id: NameId, offset: usize, length: usize) -> Value {

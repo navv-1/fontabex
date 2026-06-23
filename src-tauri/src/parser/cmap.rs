@@ -1,4 +1,4 @@
-use super::reader::Reader;
+use super::reader::{parsed_field, Reader};
 use read_fonts::tables::cmap::{
     CmapSubtable, ConstantMapGroup, EncodingRecord, PlatformId, SequentialMapGroup,
     VariationSelector,
@@ -456,20 +456,6 @@ fn parse_variation_selector(selector: &VariationSelector) -> Value {
             7,
             4
         )
-    })
-}
-
-fn parsed_field<T: Serialize>(
-    data_type: &'static str,
-    value: T,
-    offset: usize,
-    length: usize,
-) -> Value {
-    json!({
-        "type": data_type,
-        "value": value,
-        "offset": offset,
-        "length": length
     })
 }
 

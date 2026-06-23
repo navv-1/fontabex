@@ -1,3 +1,4 @@
+use super::reader::parsed_field;
 use read_fonts::{
     tables::variations::{
         DeltaSetIndexMap, DeltaSetIndexMapFormat0, DeltaSetIndexMapFormat1, ItemVariationData,
@@ -301,18 +302,4 @@ fn read_uint_be(bytes: &[u8]) -> Result<u32, String> {
             bytes.len()
         )),
     }
-}
-
-fn parsed_field<T: serde::Serialize>(
-    data_type: &'static str,
-    value: T,
-    offset: usize,
-    length: usize,
-) -> Value {
-    json!({
-        "type": data_type,
-        "value": value,
-        "offset": offset,
-        "length": length
-    })
 }
