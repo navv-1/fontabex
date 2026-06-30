@@ -14,6 +14,18 @@ const ITEM_VARIATION_STORE_HEADER_SIZE: usize = 8;
 const ITEM_VARIATION_DATA_HEADER_SIZE: usize = 6;
 const REGION_AXIS_COORDINATES_SIZE: usize = 6;
 
+fn get_variation_region_list_length(region_list: &VariationRegionList<'_>) -> usize {
+    4 + region_list.region_count() as usize
+        * region_list.axis_count() as usize
+        * REGION_AXIS_COORDINATES_SIZE
+}
+
+fn get_item_variation_data_length(data: &ItemVariationData<'_>) -> usize {
+    ITEM_VARIATION_DATA_HEADER_SIZE
+        + data.region_index_count() as usize * 2
+        + data.item_count() as usize * data.get_delta_row_len()
+}
+
 pub fn parse_delta_set_index_map(
     index_map: &DeltaSetIndexMap<'_>,
     offset: usize,
@@ -32,6 +44,36 @@ pub fn parse_item_variation_store(
     let region_list = store.variation_region_list().map_err(|e| e.to_string())?;
     let data_offsets = store.item_variation_data_offsets();
     let item_variation_data = store.item_variation_data();
+
+    let mut data_start_offset = usize::MAX;
+    let mut data_end_offset = 0;
+
+    let parsed_item_variation_data = data_offsets
+        .iter()
+        .enumerate()
+        .map(|(index, data_offset)| {
+            let data_offset_value = data_offset.get();
+            if data_offset_value.is_null() {
+                return Ok(Value::Null);
+            }
+            let Some(data) = item_variation_data.get(index) else {
+                return Ok(Value::Null);
+            };
+            let data = data.map_err(|e| e.to_string())?;
+            let data_table_offset = offset + data_offset_value.offset().to_u32() as usize;
+
+            data_start_offset = data_start_offset.min(data_table_offset);
+            data_end_offset =
+                data_end_offset.max(data_table_offset + get_item_variation_data_length(&data));
+
+            Ok(parse_item_variation_data(&data, data_table_offset))
+        })
+        .collect::<Result<Vec<_>, String>>()?;
+
+    if data_start_offset == usize::MAX {
+        data_start_offset = offset + ITEM_VARIATION_STORE_HEADER_SIZE + data_offsets.len() * 4;
+        data_end_offset = data_start_offset;
+    }
 
     Ok(json!({
         "format": parsed_field("uint16", store.format(), offset, 2),
@@ -63,28 +105,13 @@ pub fn parse_item_variation_store(
             "VariationRegionList",
             parse_variation_region_list(&region_list, region_list_offset),
             region_list_offset,
-            region_list.min_table_bytes().len(),
+            get_variation_region_list_length(&region_list),
         ),
         "itemVariationData": {
             "type": "ItemVariationData[]",
-            "value": data_offsets
-                .iter()
-                .enumerate()
-                .map(|(index, data_offset)| {
-                    let data_offset_value = data_offset.get();
-                    if data_offset_value.is_null() {
-                        return Ok(Value::Null);
-                    }
-                    let Some(data) = item_variation_data.get(index) else {
-                        return Ok(Value::Null);
-                    };
-                    let data = data.map_err(|e| e.to_string())?;
-                    let data_table_offset = offset + data_offset_value.offset().to_u32() as usize;
-                    Ok(parse_item_variation_data(&data, data_table_offset))
-                })
-                .collect::<Result<Vec<_>, String>>()?,
-            "offset": offset,
-            "length": item_variation_store_length(store)
+            "value": parsed_item_variation_data,
+            "offset": data_start_offset,
+            "length": data_end_offset - data_start_offset
         }
     }))
 }
@@ -95,7 +122,7 @@ pub fn item_variation_store_length(store: &ItemVariationStore<'_>) -> usize {
     if let Ok(region_list) = store.variation_region_list() {
         length = length.max(
             store.variation_region_list_offset().to_u32() as usize
-                + region_list.min_table_bytes().len(),
+                + get_variation_region_list_length(&region_list),
         );
     }
 
@@ -106,8 +133,9 @@ pub fn item_variation_store_length(store: &ItemVariationStore<'_>) -> usize {
             continue;
         }
         if let Some(Ok(data)) = item_variation_data.get(index) {
-            length =
-                length.max(data_offset.offset().to_u32() as usize + data.min_table_bytes().len());
+            length = length.max(
+                data_offset.offset().to_u32() as usize + get_item_variation_data_length(&data),
+            );
         }
     }
 
@@ -124,10 +152,9 @@ fn parse_delta_set_index_map_format0(
         "entryFormat": entry_format_field(entry_format, offset + 1),
         "mapCount": parsed_field("uint16", table.map_count(), offset + 2, 2),
         "mapData": parse_delta_set_index_map_data(
-            entry_format,
             table.map_data(),
             offset + DELTA_SET_INDEX_MAP_FORMAT_0_HEADER_SIZE,
-        )?
+        )
     }))
 }
 
@@ -141,39 +168,25 @@ fn parse_delta_set_index_map_format1(
         "entryFormat": entry_format_field(entry_format, offset + 1),
         "mapCount": parsed_field("uint32", table.map_count(), offset + 2, 4),
         "mapData": parse_delta_set_index_map_data(
-            entry_format,
             table.map_data(),
             offset + DELTA_SET_INDEX_MAP_FORMAT_1_HEADER_SIZE,
-        )?
+        )
     }))
 }
 
-fn parse_delta_set_index_map_data(
-    entry_format: read_fonts::tables::variations::EntryFormat,
-    data: &[u8],
-    offset: usize,
-) -> Result<Value, String> {
-    let entry_size = entry_format.entry_size() as usize;
-    let bit_count = entry_format.bit_count();
+fn parse_delta_set_index_map_data(data: &[u8], offset: usize) -> Value {
     let entries = data
-        .chunks_exact(entry_size)
+        .iter()
         .enumerate()
-        .map(|(index, bytes)| {
-            let entry = read_uint_be(bytes)?;
-            let inner_mask = (1u32 << bit_count) - 1;
-            Ok(json!({
-                "outerIndex": parsed_field("uint16", (entry >> bit_count) as u16, offset + index * entry_size, entry_size),
-                "innerIndex": parsed_field("uint16", (entry & inner_mask) as u16, offset + index * entry_size, entry_size)
-            }))
-        })
-        .collect::<Result<Vec<_>, String>>()?;
+        .map(|(index, byte)| parsed_field("uint8", *byte, offset + index, 1))
+        .collect::<Vec<_>>();
 
-    Ok(json!({
-        "type": "DeltaSetIndex[]",
+    json!({
+        "type": "uint8[]",
         "value": entries,
         "offset": offset,
         "length": data.len()
-    }))
+    })
 }
 
 fn parse_variation_region_list(region_list: &VariationRegionList<'_>, offset: usize) -> Value {
@@ -289,17 +302,4 @@ fn entry_format_field(
         entry_format.bit_count()
     ));
     field
-}
-
-fn read_uint_be(bytes: &[u8]) -> Result<u32, String> {
-    match bytes {
-        [a] => Ok(u32::from(*a)),
-        [a, b] => Ok(u32::from_be_bytes([0, 0, *a, *b])),
-        [a, b, c] => Ok(u32::from_be_bytes([0, *a, *b, *c])),
-        [a, b, c, d] => Ok(u32::from_be_bytes([*a, *b, *c, *d])),
-        _ => Err(format!(
-            "unsupported DeltaSetIndexMap entry size {}",
-            bytes.len()
-        )),
-    }
 }
