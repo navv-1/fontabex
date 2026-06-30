@@ -149,6 +149,22 @@ fn show_native_window_menu(_window: tauri::Window) -> Result<bool, String> {
     Ok(false)
 }
 
+#[tauri::command]
+fn parse_lazy_batch(
+    path: String,
+    command: String,
+    offset: usize,
+    limit: usize,
+) -> Result<serde_json::Value, String> {
+    let bytes = std::fs::read(&path).map_err(|e| e.to_string())?;
+    let font = read_fonts::FontRef::new(&bytes).map_err(|e| e.to_string())?;
+
+    match command.as_str() {
+        "parse_glyf_batch" => parser::glyf::parse_batch(&font, offset, limit),
+        _ => Err(format!("Unknown lazy command: {}", command)),
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -156,9 +172,11 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             parse_font_tables,
-            parser::parse_specific_table,
             get_table_bytes,
-            show_native_window_menu
+            parser::parse_specific_table,
+            parse_lazy_batch,
+            #[cfg(windows)]
+            show_native_window_menu,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

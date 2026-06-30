@@ -11,6 +11,7 @@
     snapScroll?: boolean;
     children?: Snippet<[any, number]>;
     footer?: Snippet;
+    onreachedbottom?: () => void;
     [key: string]: any;
   }
 
@@ -26,6 +27,7 @@
     snapScroll = false,
     children,
     footer,
+    onreachedbottom,
     ...rest
   }: Props = $props();
 
@@ -178,15 +180,19 @@
     const currentScrollTop = viewport.scrollTop;
     last_internal_scroll_top = currentScrollTop;
     scrollTop = currentScrollTop;
+    const listLength = items.length;
 
     if (itemHeight) {
       start = Math.floor(currentScrollTop / itemHeight);
       top = start * itemHeight;
       end = Math.min(
-        items.length,
+        listLength,
         start + Math.ceil(viewport_height / itemHeight) + 1,
       );
-      bottom = (items.length - end) * itemHeight;
+      bottom = (listLength - end) * itemHeight;
+      if (end >= listLength - 5 && onreachedbottom) {
+        onreachedbottom();
+      }
       return;
     }
 
@@ -224,6 +230,10 @@
 
     while (i < items.length) height_map[i++] = average_height;
     bottom = remaining * average_height;
+
+    if (end >= items.length - 5 && onreachedbottom) {
+      onreachedbottom();
+    }
 
     // prevent jumping if we scrolled up into unknown territory
     if (start < old_start) {
