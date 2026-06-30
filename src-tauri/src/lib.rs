@@ -51,14 +51,14 @@ fn parse_font_tables(path: String) -> Result<FontInfo, String> {
 mod parser;
 
 #[tauri::command]
-fn get_table_bytes(path: String, offset: u32, length: u32) -> Result<Vec<u8>, String> {
+fn get_table_bytes(path: String, offset: u32, length: u32) -> Result<tauri::ipc::Response, String> {
     use std::io::{Read, Seek};
     let mut file = std::fs::File::open(&path).map_err(|e| e.to_string())?;
     file.seek(std::io::SeekFrom::Start(offset as u64))
         .map_err(|e| e.to_string())?;
     let mut buffer = vec![0; length as usize];
     file.read_exact(&mut buffer).map_err(|e| e.to_string())?;
-    Ok(buffer)
+    Ok(tauri::ipc::Response::new(buffer))
 }
 
 #[cfg(windows)]

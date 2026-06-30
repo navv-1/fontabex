@@ -397,17 +397,22 @@
           parsedError = String(e);
           return null;
         }),
-        invoke<number[]>("get_table_bytes", {
+        invoke<Uint8Array | ArrayBuffer | number[]>("get_table_bytes", {
           path: fontPath,
           offset: table.offset,
           length: table.length,
         }).catch((e) => {
           console.error("Failed to fetch raw bytes:", e);
-          return [];
+          return new Uint8Array(0);
         }),
       ]);
       parsedData = data;
-      rawBytes = new Uint8Array(bytesArray);
+      rawBytes =
+        bytesArray instanceof Uint8Array
+          ? bytesArray
+          : bytesArray instanceof ArrayBuffer
+            ? new Uint8Array(bytesArray)
+            : new Uint8Array(bytesArray);
     } catch (e) {
       if (!parsedError) parsedError = String(e);
     } finally {

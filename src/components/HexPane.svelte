@@ -32,7 +32,25 @@
     return 4;
   });
 
-  let hexRows = $derived(getHexRows(rawBytes, bytesPerRow));
+  let hexRows = $derived.by(() => {
+    if (!rawBytes) return { length: 0, slice: () => [] };
+    const rowSize = bytesPerRow;
+    const length = Math.ceil(rawBytes.length / rowSize);
+    return {
+      length,
+      slice(start: number, end: number) {
+        const rows: HexRow[] = [];
+        for (let i = start; i < end && i < length; i++) {
+          const offset = i * rowSize;
+          rows.push({
+            offset,
+            bytes: rawBytes.slice(offset, offset + rowSize),
+          });
+        }
+        return rows;
+      },
+    };
+  });
 
   export function scrollToOffset(offset: number) {
     scrollToByteOffset(offset);
@@ -49,18 +67,6 @@
       const rowIndex = Math.floor(offset / bytesPerRow);
       virtualListRef.scrollToIndex(rowIndex, "auto", "nearest");
     }
-  }
-
-  function getHexRows(bytes: Uint8Array | null, rowSize: number) {
-    if (!bytes) return [];
-    const rows: HexRow[] = [];
-    for (let i = 0; i < bytes.length; i += rowSize) {
-      rows.push({
-        offset: i,
-        bytes: bytes.slice(i, i + rowSize),
-      });
-    }
-    return rows;
   }
 
   function formatHexOffset(offset: number) {
@@ -106,7 +112,7 @@
         {:else if hexRows.length > 0}
           <VirtualList
             bind:this={virtualListRef}
-            items={hexRows}
+            items={hexRows as any}
             itemHeight={24}
           >
             {#snippet children(row: HexRow)}
