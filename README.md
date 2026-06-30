@@ -11,6 +11,7 @@ Fontabex opens local `.ttf` and `.otf` files, lists their OpenType tables, and s
 - Open fonts with the file picker or drag and drop.
 - Browse the table directory with table tags, offsets, lengths, and sizes.
 - Inspect parsed table fields with data types, offsets, lengths, values, nested arrays, and records.
+- Efficiently inspect large tables and arrays with lazy loading.
 - Search parsed data by index, all columns, or specific columns.
 - Resize parsed-data columns (double-click the resize handle to reset).
 - View raw table bytes in a synchronized hex pane.
@@ -22,23 +23,7 @@ Fontabex opens local `.ttf` and `.otf` files, lists their OpenType tables, and s
 
 The Rust parser currently has structured parsers for:
 
-- Table Directory
-- `avar`
-- `cmap`
-- `fvar`
-- `head`
-- `hhea`
-- `hmtx`
-- `HVAR`
-- `maxp`
-- `MVAR`
-- `name`
-- `OS/2`
-- `post`
-- `STAT`
-- `vhea`
-- `vmtx`
-- `VVAR`
+Table Directory, `avar`, `cmap`, `fvar`, `glyf`, `head`, `hhea`, `hmtx`, `HVAR`, `loca`, `maxp`, `MVAR`, `name`, `OS/2`, `post`, `STAT`, `vhea`, `vmtx`, `VVAR`.
 
 Other tables are still listed in the directory and can be inspected through their raw bytes, but structured parsing is added table by table.
 
