@@ -47,7 +47,7 @@
     if (virtualListRef && bytesPerRow > 0) {
       await tick();
       const rowIndex = Math.floor(offset / bytesPerRow);
-      virtualListRef.scrollToIndex(rowIndex, "auto", "center");
+      virtualListRef.scrollToIndex(rowIndex, "auto", "nearest");
     }
   }
 
