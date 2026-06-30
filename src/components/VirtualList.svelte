@@ -11,6 +11,7 @@
     snapScroll?: boolean;
     children?: Snippet<[any, number]>;
     footer?: Snippet;
+    onreachedbottom?: () => void;
     [key: string]: any;
   }
 
@@ -26,6 +27,7 @@
     snapScroll = false,
     children,
     footer,
+    onreachedbottom,
     ...rest
   }: Props = $props();
 
@@ -116,6 +118,20 @@
 
     await tick(); // wait until the DOM is up to date
 
+    if (itemHeight) {
+      start = Math.floor(currentScrollTop / itemHeight);
+      top = start * itemHeight;
+      end = Math.min(
+        items.length,
+        start + Math.ceil(viewport_height / itemHeight) + 1,
+      );
+      bottom = (items.length - end) * itemHeight;
+      if (scrollTop > 0 && Math.abs(viewport.scrollTop - scrollTop) > 1) {
+        viewport.scrollTop = scrollTop;
+      }
+      return;
+    }
+
     let content_height = top - currentScrollTop;
     let i = start;
 
@@ -151,8 +167,6 @@
 
   function handle_scroll() {
     if (!viewport) return;
-    // Debounce via RAF to avoid blocking the main thread with
-    // synchronous DOM measurement during rapid scrolling
     if (scroll_raf) return;
     scroll_raf = requestAnimationFrame(() => {
       scroll_raf = null;
@@ -166,6 +180,21 @@
     const currentScrollTop = viewport.scrollTop;
     last_internal_scroll_top = currentScrollTop;
     scrollTop = currentScrollTop;
+    const listLength = items.length;
+
+    if (itemHeight) {
+      start = Math.floor(currentScrollTop / itemHeight);
+      top = start * itemHeight;
+      end = Math.min(
+        listLength,
+        start + Math.ceil(viewport_height / itemHeight) + 1,
+      );
+      bottom = (listLength - end) * itemHeight;
+      if (end >= listLength - 5 && onreachedbottom) {
+        onreachedbottom();
+      }
+      return;
+    }
 
     const old_start = start;
 
@@ -182,10 +211,8 @@
       if (y + row_height > currentScrollTop) {
         start = i;
         top = y;
-
         break;
       }
-
       y += row_height;
       i += 1;
     }
@@ -193,7 +220,6 @@
     while (i < items.length) {
       y += height_map[i] || average_height;
       i += 1;
-
       if (y > currentScrollTop + viewport_height) break;
     }
 
@@ -204,6 +230,10 @@
 
     while (i < items.length) height_map[i++] = average_height;
     bottom = remaining * average_height;
+
+    if (end >= items.length - 5 && onreachedbottom) {
+      onreachedbottom();
+    }
 
     // prevent jumping if we scrolled up into unknown territory
     if (start < old_start) {

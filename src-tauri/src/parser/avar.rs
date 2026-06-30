@@ -1,5 +1,5 @@
 use super::{
-    reader::Reader,
+    reader::{parsed_field, read_u16_at, Reader},
     variations::{
         item_variation_store_length, parse_delta_set_index_map, parse_item_variation_store,
     },
@@ -138,26 +138,4 @@ fn parse_axis_value_map(value_map: &AxisValueMap, offset: usize) -> Value {
 
 fn segment_map_length(segment_map: &SegmentMaps<'_>) -> usize {
     2 + segment_map.axis_value_maps().len() * AXIS_VALUE_MAP_SIZE
-}
-
-fn parsed_field<T: serde::Serialize>(
-    data_type: &'static str,
-    value: T,
-    offset: usize,
-    length: usize,
-) -> Value {
-    json!({
-        "type": data_type,
-        "value": value,
-        "offset": offset,
-        "length": length
-    })
-}
-
-fn read_u16_at(bytes: &[u8], offset: usize) -> u16 {
-    bytes
-        .get(offset..offset + 2)
-        .and_then(|bytes| bytes.try_into().ok())
-        .map(u16::from_be_bytes)
-        .unwrap_or_default()
 }

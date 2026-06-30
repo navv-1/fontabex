@@ -1,4 +1,4 @@
-use super::reader::Reader;
+use super::reader::{parsed_field, Reader};
 use encoding_rs::{BIG5, EUC_KR, GBK, MACINTOSH, SHIFT_JIS, UTF_16BE, WINDOWS_1252};
 use read_fonts::{tables::name::NameRecord, types::NameId, FontRef, TableProvider};
 use serde_json::{json, Value};
@@ -135,20 +135,6 @@ fn parse_name_record(
         "nameID": name_id,
         "length": length,
         "stringOffset": string_offset
-    })
-}
-
-fn parsed_field<T: serde::Serialize>(
-    data_type: &'static str,
-    value: T,
-    offset: usize,
-    length: usize,
-) -> Value {
-    json!({
-        "type": data_type,
-        "value": value,
-        "offset": offset,
-        "length": length
     })
 }
 

@@ -683,6 +683,11 @@ body {
   cursor: pointer;
   text-decoration: none;
   text-underline-offset: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+  text-align: left;
 }
 
 .value-link:hover,

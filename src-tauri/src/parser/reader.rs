@@ -52,3 +52,25 @@ fn font_type_name<T>() -> &'static str {
         _ => type_name::<T>().rsplit("::").next().unwrap_or("unknown"),
     }
 }
+
+pub fn read_u16_at(bytes: &[u8], offset: usize) -> u16 {
+    bytes
+        .get(offset..offset + 2)
+        .and_then(|bytes| bytes.try_into().ok())
+        .map(u16::from_be_bytes)
+        .unwrap_or_default()
+}
+
+pub fn parsed_field<T: Serialize>(
+    data_type: &'static str,
+    value: T,
+    offset: usize,
+    length: usize,
+) -> Value {
+    json!({
+        "type": data_type,
+        "value": value,
+        "offset": offset,
+        "length": length
+    })
+}

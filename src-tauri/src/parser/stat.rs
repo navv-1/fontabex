@@ -1,4 +1,7 @@
-use super::{name::name_id_label, reader::Reader};
+use super::{
+    name::name_id_label,
+    reader::{parsed_field, Reader},
+};
 use read_fonts::{
     tables::stat::{
         AxisRecord, AxisValue, AxisValueFormat1, AxisValueFormat2, AxisValueFormat3,
@@ -241,20 +244,6 @@ fn axis_value_length(axis_value: &AxisValue<'_>) -> usize {
         AxisValue::Format3(table) => table.min_table_bytes().len(),
         AxisValue::Format4(table) => table.min_table_bytes().len(),
     }
-}
-
-fn parsed_field<T: serde::Serialize>(
-    data_type: &'static str,
-    value: T,
-    offset: usize,
-    length: usize,
-) -> Value {
-    json!({
-        "type": data_type,
-        "value": value,
-        "offset": offset,
-        "length": length
-    })
 }
 
 fn name_id_field(name_id: NameId, offset: usize, length: usize) -> Value {

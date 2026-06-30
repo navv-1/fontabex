@@ -397,17 +397,22 @@
           parsedError = String(e);
           return null;
         }),
-        invoke<number[]>("get_table_bytes", {
+        invoke<Uint8Array | ArrayBuffer | number[]>("get_table_bytes", {
           path: fontPath,
           offset: table.offset,
           length: table.length,
         }).catch((e) => {
           console.error("Failed to fetch raw bytes:", e);
-          return [];
+          return new Uint8Array(0);
         }),
       ]);
       parsedData = data;
-      rawBytes = new Uint8Array(bytesArray);
+      rawBytes =
+        bytesArray instanceof Uint8Array
+          ? bytesArray
+          : bytesArray instanceof ArrayBuffer
+            ? new Uint8Array(bytesArray)
+            : new Uint8Array(bytesArray);
     } catch (e) {
       if (!parsedError) parsedError = String(e);
     } finally {
@@ -462,12 +467,57 @@
     return value.type.slice(0, -2);
   }
 
-  let currentParsedPage = $derived.by(() => {
+  let currentParsedPageRaw = $derived.by(() => {
     if (parsedPageStack.length > 0) {
       return parsedPageStack[parsedPageStack.length - 1].data;
     }
     return parsedData;
   });
+
+  let currentParsedPage = $derived.by(() => {
+    if (
+      currentParsedPageRaw &&
+      typeof currentParsedPageRaw === "object" &&
+      currentParsedPageRaw._is_lazy_array
+    ) {
+      return currentParsedPageRaw.loaded;
+    }
+    return currentParsedPageRaw;
+  });
+
+  let fetchingLazyItems = $state(false);
+  async function loadMoreLazyItems() {
+    if (fetchingLazyItems) return;
+    const raw = currentParsedPageRaw;
+    if (!raw || typeof raw !== "object" || !raw._is_lazy_array) return;
+
+    if (raw.loaded.length >= raw.total) return;
+
+    fetchingLazyItems = true;
+    try {
+      const offset = raw.loaded.length;
+      const limit = 100;
+      const nextBatch = await invoke<any>("parse_lazy_batch", {
+        path: fontPath,
+        command: raw.lazy_command,
+        offset,
+        limit,
+      });
+
+      raw.loaded = [...raw.loaded, ...nextBatch];
+
+      // Force reactivity
+      if (parsedPageStack.length > 0) {
+        parsedPageStack = [...parsedPageStack];
+      } else {
+        parsedData = { ...parsedData };
+      }
+    } catch (e) {
+      console.error("Failed to load lazy items", e);
+    } finally {
+      fetchingLazyItems = false;
+    }
+  }
 
   let currentParsedArrayItemType = $derived.by(() => {
     if (parsedPageStack.length === 0) return;
@@ -824,6 +874,14 @@
   });
 
   let currentParsedTotalCount = $derived.by(() => {
+    if (
+      currentParsedPageRaw &&
+      typeof currentParsedPageRaw === "object" &&
+      currentParsedPageRaw._is_lazy_array &&
+      typeof currentParsedPageRaw.total === "number"
+    ) {
+      return currentParsedPageRaw.total;
+    }
     if (currentParsedObjectRows.length > 0)
       return currentParsedObjectRows.length;
     return currentParsedEntries.length;
@@ -1266,6 +1324,7 @@
                       items={filteredParsedObjectRows}
                       height="auto"
                       itemHeight={44}
+                      onreachedbottom={loadMoreLazyItems}
                     >
                       {#snippet children(item)}
                         {@const row = item.row}
@@ -1416,6 +1475,7 @@
                       items={filteredParsedEntries}
                       height="auto"
                       itemHeight={44}
+                      onreachedbottom={loadMoreLazyItems}
                     >
                       {#snippet children(item)}
                         {@const entry = item.entry}

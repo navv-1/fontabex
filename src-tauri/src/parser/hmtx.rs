@@ -1,7 +1,7 @@
+use super::reader::parsed_field;
 use read_fonts::tables::hmtx::LongMetric;
 use read_fonts::types::FixedSize;
 use read_fonts::{FontRef, TableProvider};
-use serde::Serialize;
 use serde_json::{json, Value};
 
 pub fn parse(font: &FontRef<'_>) -> Result<Value, String> {
@@ -45,19 +45,5 @@ fn parse_long_metric(index: usize, metric: &LongMetric) -> Value {
     json!({
         "advanceWidth": parsed_field("UFWORD", metric.advance(), offset, 2),
         "lsb": parsed_field("FWORD", metric.side_bearing(), offset + 2, 2)
-    })
-}
-
-fn parsed_field<T: Serialize>(
-    data_type: &'static str,
-    value: T,
-    offset: usize,
-    length: usize,
-) -> Value {
-    json!({
-        "type": data_type,
-        "value": value,
-        "offset": offset,
-        "length": length
     })
 }

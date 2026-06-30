@@ -36,7 +36,13 @@ export function formatValue(value: unknown): string {
     if (Array.isArray(value)) {
       return `[${value.length} ${isRecordArray(value) ? "records" : "items"}]`;
     }
-    return `[Object(${Object.keys(value).length})]`;
+    const keys = Object.keys(value);
+    if (keys.length === 0) return "{}";
+    const displayEntries = keys
+      .slice(0, 2)
+      .map((k) => `${k}: ${formatParsedValue((value as any)[k])}`);
+    if (keys.length > 2) displayEntries.push("...");
+    return `{${displayEntries.join(", ")}}`;
   }
   return String(value);
 }
