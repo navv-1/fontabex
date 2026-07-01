@@ -12,13 +12,13 @@
 - Improved the Parsed Data table selection styling specificity so the blue active selection highlight is never overwritten by passive search highlights.
 - Updated the variation `deltaSets` parsing to conform perfectly to the OpenType spec (producing `DeltaSet` records with fully unpackaged, explicitly typed, and selectable `ParsedField` elements).
 - Disabled spellchecking across all search inputs.
-- Empty arrays `[]` now render correctly as plain text without an unclickable value-link.
+- Empty arrays now render correctly as `[]` instead of `[0 items]` or `[0 records]`.
 
 ### Fixed
 
 - Fixed search iteration logic that was entirely skipping index `0`.
 - Fixed the backend search logic which could get permanently stuck when finding the first match in massive lazy tables.
-- Fixed specific column targeting for Svelte cell highlighting and Rust `glyf` data extraction.
+- Improved search highlighting to target specific matched cells rather than highlighting the entire row.
 - Fixed the `Index` column search logic to enforce exact numeric matching instead of partial string matching.
 
 ## 0.3.0 - 2026-06-30
@@ -26,7 +26,7 @@
 ### Added
 
 - Added `glyf` and `loca` table parsers with backend lazy-loading support for massive fonts.
-- Added vertical metrics table parsers (`vhea`, `vmtx`, etc.).
+- Added `vhea`, `vmtx`, `vvar` table parsers.
 - Added `HVAR` and `MVAR` table parsers.
 
 ### Changed
