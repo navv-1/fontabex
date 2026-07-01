@@ -404,6 +404,42 @@ body {
   cursor: pointer;
 }
 
+.nav-btn-group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.nav-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-color);
+  border-radius: 6px;
+  color: var(--text-color);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  padding: 0;
+}
+
+.nav-btn:hover {
+  background: var(--sidebar-bg);
+  border-color: color-mix(in srgb, var(--border-color) 70%, var(--text-color));
+}
+
+.nav-btn svg {
+  width: 14px;
+  height: 14px;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  fill: none;
+}
+
 .parsed-crumb:hover {
   color: var(--primary);
 }
@@ -627,19 +663,19 @@ body {
 
 .virtual-data-row.selected-data-row .virtual-data-cell,
 .virtual-data-row .virtual-data-cell.selected-data-cell {
-  background: color-mix(in srgb, var(--primary) 12%, transparent);
+  background: color-mix(in srgb, var(--primary) 12%, transparent) !important;
 }
 
 .virtual-data-row.selected-data-row:hover .virtual-data-cell {
-  background: color-mix(in srgb, var(--primary) 16%, transparent);
+  background: color-mix(in srgb, var(--primary) 16%, transparent) !important;
 }
 
 .virtual-data-row:hover .virtual-data-cell.selected-data-cell {
-  background: color-mix(in srgb, var(--primary) 16%, transparent);
+  background: color-mix(in srgb, var(--primary) 16%, transparent) !important;
 }
 
 .virtual-data-row .virtual-data-cell.selected-data-cell:hover {
-  background: color-mix(in srgb, var(--primary) 20%, transparent);
+  background: color-mix(in srgb, var(--primary) 20%, transparent) !important;
 }
 
 /* Column sizing is controlled exclusively by grid-template-columns.
@@ -920,4 +956,36 @@ th.col-val {
 .split-resizer.active::before {
   background: var(--primary);
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--primary) 18%, transparent);
+}
+
+.search-match-highlight .virtual-data-cell {
+  background-color: color-mix(
+    in srgb,
+    var(--text-color) 8%,
+    transparent
+  ) !important;
+}
+
+.search-match-highlight:hover .virtual-data-cell {
+  background-color: color-mix(
+    in srgb,
+    var(--text-color) 15%,
+    transparent
+  ) !important;
+}
+
+.search-match-highlight .virtual-data-cell.search-match-cell {
+  background-color: color-mix(
+    in srgb,
+    var(--text-color) 25%,
+    transparent
+  ) !important;
+}
+
+.search-match-highlight:hover .virtual-data-cell.search-match-cell {
+  background-color: color-mix(
+    in srgb,
+    var(--text-color) 35%,
+    transparent
+  ) !important;
 }

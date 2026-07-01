@@ -10,11 +10,17 @@ pub fn parse(font: &FontRef<'_>) -> Result<Value, String> {
         "_is_lazy_array": true,
         "lazy_command": "parse_glyf_batch",
         "total": num_glyphs,
-        "loaded": parse_batch(font, 0, 100)?
+        "loaded": parse_batch(font, 0, 100, None, None)?["items"].clone()
     }))
 }
 
-pub fn parse_batch(font: &FontRef<'_>, offset: usize, limit: usize) -> Result<Value, String> {
+pub fn parse_batch(
+    font: &FontRef<'_>,
+    offset: usize,
+    limit: usize,
+    search_target: Option<String>,
+    search_query: Option<String>,
+) -> Result<Value, String> {
     let loca = font.loca(None).map_err(|e| e.to_string())?;
     let glyf = font.glyf().map_err(|e| e.to_string())?;
     let maxp = font.maxp().map_err(|e| e.to_string())?;
@@ -22,266 +28,429 @@ pub fn parse_batch(font: &FontRef<'_>, offset: usize, limit: usize) -> Result<Va
 
     let mut glyphs = Vec::new();
 
-    let end = std::cmp::min(offset + limit, num_glyphs);
-    for i in offset..end {
-        let gid = read_fonts::types::GlyphId::new(i as u32);
-        let glyph_res = loca.get_glyf(gid, &glyf);
-
-        let start_offset = loca.get_raw(i).unwrap_or(0);
-        let end_offset = loca.get_raw(i + 1).unwrap_or(start_offset);
-        let total_length = end_offset.saturating_sub(start_offset);
-
-        match glyph_res {
-            Ok(Some(glyph)) => {
-                let mut curr = start_offset;
-
-                let header_obj = json!({
-                    "numberOfContours": {
-                        "type": "int16",
-                        "value": match glyph {
-                            read_fonts::tables::glyf::Glyph::Simple(ref s) => s.number_of_contours(),
-                            read_fonts::tables::glyf::Glyph::Composite(_) => -1,
-                        },
-                        "offset": curr,
-                        "length": 2
-                    },
-                    "xMin": { "type": "int16", "value": glyph.x_min(), "offset": curr + 2, "length": 2 },
-                    "yMin": { "type": "int16", "value": glyph.y_min(), "offset": curr + 4, "length": 2 },
-                    "xMax": { "type": "int16", "value": glyph.x_max(), "offset": curr + 6, "length": 2 },
-                    "yMax": { "type": "int16", "value": glyph.y_max(), "offset": curr + 8, "length": 2 },
-                });
-
-                let header = json!({
-                    "type": "GlyphHeader",
-                    "value": header_obj,
-                    "offset": curr,
-                    "length": std::cmp::min(10, total_length)
-                });
-
-                curr += 10;
-
-                let mut glyph_data = json!({
-                    "header": header
-                });
-
-                match glyph {
-                    read_fonts::tables::glyf::Glyph::Simple(simple) => {
-                        let num_contours = simple.number_of_contours() as u32;
-                        let end_pts: Vec<u16> = simple
-                            .end_pts_of_contours()
-                            .iter()
-                            .map(|p| p.get())
-                            .collect();
-                        let pts_length = num_contours * 2;
-                        let inst_len = simple.instruction_length();
-
-                        let data = simple.glyph_data();
-                        let n_points = end_pts.last().map(|last| *last as u16 + 1).unwrap_or(0);
-                        let mut flags_bytes = Vec::new();
-                        let mut x_coords = Vec::new();
-                        let mut y_coords = Vec::new();
-
-                        let flags_offset = curr + pts_length + 2 + inst_len as u32;
-                        let mut x_offset = flags_offset;
-                        let mut y_offset = flags_offset;
-
-                        if let Ok((f_len, x_len, y_len)) = resolve_coords_len(data, n_points) {
-                            if f_len as usize + x_len as usize + y_len as usize <= data.len() {
-                                flags_bytes = data[..f_len as usize].to_vec();
-                                x_coords = data[f_len as usize..(f_len + x_len) as usize].to_vec();
-                                y_coords = data
-                                    [(f_len + x_len) as usize..(f_len + x_len + y_len) as usize]
-                                    .to_vec();
-                                x_offset = flags_offset + f_len;
-                                y_offset = x_offset + x_len;
-                            }
-                        }
-
-                        let end_pts_array: Vec<_> = end_pts
-                            .iter()
-                            .enumerate()
-                            .map(|(idx, &val)| {
-                                json!({
-                                    "type": "uint16",
-                                    "value": val,
-                                    "offset": curr + (idx * 2) as u32,
-                                    "length": 2
-                                })
-                            })
-                            .collect();
-
-                        let inst_array: Vec<_> = simple
-                            .instructions()
-                            .iter()
-                            .enumerate()
-                            .map(|(idx, &val)| {
-                                json!({
-                                    "type": "uint8",
-                                    "value": val,
-                                    "offset": curr + pts_length + 2 + idx as u32,
-                                    "length": 1
-                                })
-                            })
-                            .collect();
-
-                        let flags_array: Vec<_> = flags_bytes
-                            .iter()
-                            .enumerate()
-                            .map(|(idx, &val)| {
-                                json!({
-                                    "type": "uint8",
-                                    "value": val,
-                                    "summary": format_simple_flag(val),
-                                    "offset": flags_offset + idx as u32,
-                                    "length": 1
-                                })
-                            })
-                            .collect();
-
-                        let x_coords_array =
-                            parse_coordinate_array(&flags_bytes, &x_coords, true, x_offset);
-                        let y_coords_array =
-                            parse_coordinate_array(&flags_bytes, &y_coords, false, y_offset);
-
-                        let simple_obj = json!({
-                            "endPtsOfContours": {
-                                "type": "uint16[]",
-                                "value": end_pts_array,
-                                "offset": curr,
-                                "length": pts_length
-                            },
-                            "instructionLength": {
-                                "type": "uint16",
-                                "value": inst_len,
-                                "offset": curr + pts_length,
-                                "length": 2
-                            },
-                            "instructions": {
-                                "type": "uint8[]",
-                                "value": inst_array,
-                                "offset": curr + pts_length + 2,
-                                "length": inst_len as u32
-                            },
-                            "flags": {
-                                "type": "uint8[]",
-                                "value": flags_array,
-                                "offset": flags_offset,
-                                "length": flags_bytes.len()
-                            },
-                            "xCoordinates": {
-                                "type": "(uint8|int16)[]",
-                                "value": x_coords_array,
-                                "offset": x_offset,
-                                "length": x_coords.len()
-                            },
-                            "yCoordinates": {
-                                "type": "(uint8|int16)[]",
-                                "value": y_coords_array,
-                                "offset": y_offset,
-                                "length": y_coords.len()
-                            },
-                        });
-
-                        let simple_len = total_length.saturating_sub(10);
-                        let simple_val = json!({
-                            "type": "SimpleGlyph",
-                            "value": simple_obj,
-                            "offset": curr,
-                            "length": simple_len
-                        });
-
-                        glyph_data
-                            .as_object_mut()
-                            .unwrap()
-                            .insert("simple".to_string(), simple_val);
-                    }
-                    read_fonts::tables::glyf::Glyph::Composite(composite) => {
-                        let data = composite.component_data();
-                        let (components, comp_len, has_instructions) =
-                            parse_composite_components(data, curr + 10);
-                        let mut composite_obj_map = serde_json::Map::new();
-                        composite_obj_map.insert(
-                            "components".to_string(),
-                            json!({
-                                "type": "ComponentGlyph[]",
-                                "value": components,
-                                "offset": curr + 10,
-                                "length": comp_len
-                            }),
-                        );
-
-                        if has_instructions {
-                            let inst_offset = comp_len as usize;
-                            if inst_offset + 2 <= data.len() {
-                                let num_instr =
-                                    u16::from_be_bytes([data[inst_offset], data[inst_offset + 1]]);
-                                composite_obj_map.insert(
-                                    "instructionLength".to_string(),
-                                    json!({
-                                        "type": "uint16",
-                                        "value": num_instr,
-                                        "offset": curr + 10 + inst_offset as u32,
-                                        "length": 2
-                                    }),
-                                );
-
-                                let instr_len = num_instr as usize;
-                                if inst_offset + 2 + instr_len <= data.len() {
-                                    let instr_data =
-                                        &data[inst_offset + 2..inst_offset + 2 + instr_len];
-                                    let instr_array: Vec<_> = instr_data.iter().enumerate().map(|(idx, &val)| {
-                                        json!({
-                                            "type": "uint8",
-                                            "value": val,
-                                            "offset": curr + 10 + inst_offset as u32 + 2 + idx as u32,
-                                            "length": 1
-                                        })
-                                    }).collect();
-
-                                    composite_obj_map.insert(
-                                        "instructions".to_string(),
-                                        json!({
-                                            "type": "uint8[]",
-                                            "value": instr_array,
-                                            "offset": curr + 10 + inst_offset as u32 + 2,
-                                            "length": instr_len
-                                        }),
-                                    );
-                                }
-                            }
-                        }
-
-                        let composite_obj = json!(composite_obj_map);
-
-                        let composite_len = total_length.saturating_sub(10);
-                        let composite = json!({
-                            "type": "CompositeGlyph",
-                            "value": composite_obj,
-                            "offset": curr,
-                            "length": composite_len
-                        });
-
-                        glyph_data
-                            .as_object_mut()
-                            .unwrap()
-                            .insert("composite".to_string(), composite);
-                    }
+    // Fast path for index search
+    if let (Some(target), Some(query)) = (&search_target, &search_query) {
+        if target == "index" {
+            if let Ok(idx) = query.parse::<usize>() {
+                if idx >= offset && idx < num_glyphs {
+                    let data = parse_single_glyph(&loca, &glyf, idx);
+                    glyphs.push(json!({
+                        "rowIndex": idx,
+                        "data": data
+                    }));
                 }
-
-                glyphs.push(glyph_data);
             }
-            Ok(None) => {
-                glyphs.push(json!({}));
-            }
-            Err(e) => {
-                glyphs.push(json!({
-                    "error": e.to_string(),
-                }));
-            }
+            return Ok(json!({
+                "items": glyphs,
+                "next_offset": num_glyphs
+            }));
         }
     }
 
-    Ok(json!(glyphs))
+    let query_lower = search_query.as_ref().map(|q| q.to_lowercase());
+    let mut i = offset;
+    let mut scanned = 0;
+
+    while i < num_glyphs && glyphs.len() < limit && scanned < 1000 {
+        let data = parse_single_glyph(&loca, &glyf, i);
+        scanned += 1;
+
+        let mut matches = true;
+        if let Some(q) = &query_lower {
+            let json_str = data.to_string().to_lowercase();
+            if !json_str.contains(q) {
+                matches = false;
+            }
+        }
+
+        if matches {
+            glyphs.push(json!({
+                "rowIndex": i,
+                "data": data
+            }));
+        }
+
+        i += 1;
+    }
+
+    Ok(json!({
+        "items": glyphs,
+        "next_offset": i
+    }))
+}
+
+fn extract_search_text(value: &Value) -> String {
+    if let Some(obj) = value.as_object() {
+        if obj.contains_key("value") && obj.contains_key("offset") && obj.contains_key("length") {
+            let mut text = String::new();
+            if let Some(summary) = obj.get("summary") {
+                if let Some(s) = summary.as_str() {
+                    text.push_str(s);
+                    text.push(' ');
+                }
+            }
+            if let Some(val) = obj.get("value") {
+                text.push_str(&extract_search_text(val));
+            }
+            return text;
+        } else {
+            let mut text = String::new();
+            for val in obj.values() {
+                text.push_str(&extract_search_text(val));
+                text.push(' ');
+            }
+            return text;
+        }
+    }
+    if let Some(arr) = value.as_array() {
+        let mut text = String::new();
+        for val in arr {
+            text.push_str(&extract_search_text(val));
+            text.push(' ');
+        }
+        return text;
+    }
+    if let Some(s) = value.as_str() {
+        return s.to_string();
+    }
+    value.to_string()
+}
+
+pub fn search_index(
+    font: &FontRef<'_>,
+    offset: usize,
+    search_target: Option<String>,
+    search_query: Option<String>,
+    forward: bool,
+) -> Result<Value, String> {
+    let loca = font.loca(None).map_err(|e| e.to_string())?;
+    let glyf = font.glyf().map_err(|e| e.to_string())?;
+    let maxp = font.maxp().map_err(|e| e.to_string())?;
+    let num_glyphs = maxp.num_glyphs() as usize;
+
+    let query_opt = search_query.as_ref().map(|q| q.to_lowercase());
+    if query_opt.is_none() {
+        return Ok(json!({ "index": None::<usize>, "next_offset": offset }));
+    }
+    let query = query_opt.unwrap();
+    let target_str = search_target.as_deref().unwrap_or("all");
+    let target_key = if target_str.starts_with("column:") {
+        &target_str["column:".len()..]
+    } else {
+        target_str
+    };
+
+    if target_key == "index" {
+        if let Ok(idx) = query.parse::<usize>() {
+            if idx < num_glyphs {
+                return Ok(json!({ "index": idx, "next_offset": idx }));
+            }
+        }
+        return Ok(json!({ "index": None::<usize>, "next_offset": offset }));
+    }
+
+    let mut scanned = 0;
+    let mut current = offset;
+
+    while scanned < 2000 {
+        if current >= num_glyphs {
+            break;
+        }
+
+        let data = parse_single_glyph(&loca, &glyf, current);
+        let search_data = if target_key == "all" {
+            Some(&data)
+        } else {
+            data.get(target_key)
+        };
+
+        if let Some(search_val) = search_data {
+            let text = extract_search_text(search_val).to_lowercase();
+            let is_match = if target_key == "all" {
+                text.contains(&query) || current.to_string().contains(&query)
+            } else {
+                text.contains(&query)
+            };
+
+            if is_match {
+                return Ok(json!({ "index": current, "next_offset": current }));
+            }
+        }
+
+        scanned += 1;
+        if forward {
+            current += 1;
+        } else {
+            if current == 0 {
+                break;
+            }
+            current -= 1;
+        }
+    }
+
+    Ok(json!({ "index": None::<usize>, "next_offset": current }))
+}
+
+fn parse_single_glyph(
+    loca: &read_fonts::tables::loca::Loca<'_>,
+    glyf: &read_fonts::tables::glyf::Glyf<'_>,
+    i: usize,
+) -> Value {
+    let gid = read_fonts::types::GlyphId::new(i as u32);
+    let glyph_res = loca.get_glyf(gid, glyf);
+
+    let start_offset = loca.get_raw(i).unwrap_or(0);
+    let end_offset = loca.get_raw(i + 1).unwrap_or(start_offset);
+    let total_length = end_offset.saturating_sub(start_offset);
+
+    match glyph_res {
+        Ok(Some(glyph)) => {
+            let mut curr = start_offset;
+
+            let header_obj = json!({
+                "numberOfContours": {
+                    "type": "int16",
+                    "value": match glyph {
+                        read_fonts::tables::glyf::Glyph::Simple(ref s) => s.number_of_contours(),
+                        read_fonts::tables::glyf::Glyph::Composite(_) => -1,
+                    },
+                    "offset": curr,
+                    "length": 2
+                },
+                "xMin": { "type": "int16", "value": glyph.x_min(), "offset": curr + 2, "length": 2 },
+                "yMin": { "type": "int16", "value": glyph.y_min(), "offset": curr + 4, "length": 2 },
+                "xMax": { "type": "int16", "value": glyph.x_max(), "offset": curr + 6, "length": 2 },
+                "yMax": { "type": "int16", "value": glyph.y_max(), "offset": curr + 8, "length": 2 },
+            });
+
+            let header = json!({
+                "type": "GlyphHeader",
+                "value": header_obj,
+                "offset": curr,
+                "length": std::cmp::min(10, total_length)
+            });
+
+            curr += 10;
+
+            let mut glyph_data = json!({
+                "header": header
+            });
+
+            match glyph {
+                read_fonts::tables::glyf::Glyph::Simple(simple) => {
+                    let num_contours = simple.number_of_contours() as u32;
+                    let end_pts: Vec<u16> = simple
+                        .end_pts_of_contours()
+                        .iter()
+                        .map(|p| p.get())
+                        .collect();
+                    let pts_length = num_contours * 2;
+                    let inst_len = simple.instruction_length();
+
+                    let data = simple.glyph_data();
+                    let n_points = end_pts.last().map(|last| *last as u16 + 1).unwrap_or(0);
+                    let mut flags_bytes = Vec::new();
+                    let mut x_coords = Vec::new();
+                    let mut y_coords = Vec::new();
+
+                    let flags_offset = curr + pts_length + 2 + inst_len as u32;
+                    let mut x_offset = flags_offset;
+                    let mut y_offset = flags_offset;
+
+                    if let Ok((f_len, x_len, y_len)) = resolve_coords_len(data, n_points) {
+                        if f_len as usize + x_len as usize + y_len as usize <= data.len() {
+                            flags_bytes = data[..f_len as usize].to_vec();
+                            x_coords = data[f_len as usize..(f_len + x_len) as usize].to_vec();
+                            y_coords = data
+                                [(f_len + x_len) as usize..(f_len + x_len + y_len) as usize]
+                                .to_vec();
+                            x_offset = flags_offset + f_len;
+                            y_offset = x_offset + x_len;
+                        }
+                    }
+
+                    let end_pts_array: Vec<_> = end_pts
+                        .iter()
+                        .enumerate()
+                        .map(|(idx, &val)| {
+                            json!({
+                                "type": "uint16",
+                                "value": val,
+                                "offset": curr + (idx * 2) as u32,
+                                "length": 2
+                            })
+                        })
+                        .collect();
+
+                    let inst_array: Vec<_> = simple
+                        .instructions()
+                        .iter()
+                        .enumerate()
+                        .map(|(idx, &val)| {
+                            json!({
+                                "type": "uint8",
+                                "value": val,
+                                "offset": curr + pts_length + 2 + idx as u32,
+                                "length": 1
+                            })
+                        })
+                        .collect();
+
+                    let flags_array: Vec<_> = flags_bytes
+                        .iter()
+                        .enumerate()
+                        .map(|(idx, &val)| {
+                            json!({
+                                "type": "uint8",
+                                "value": val,
+                                "summary": format_simple_flag(val),
+                                "offset": flags_offset + idx as u32,
+                                "length": 1
+                            })
+                        })
+                        .collect();
+
+                    let x_coords_array =
+                        parse_coordinate_array(&flags_bytes, &x_coords, true, x_offset);
+                    let y_coords_array =
+                        parse_coordinate_array(&flags_bytes, &y_coords, false, y_offset);
+
+                    let simple_obj = json!({
+                        "endPtsOfContours": {
+                            "type": "uint16[]",
+                            "value": end_pts_array,
+                            "offset": curr,
+                            "length": pts_length
+                        },
+                        "instructionLength": {
+                            "type": "uint16",
+                            "value": inst_len,
+                            "offset": curr + pts_length,
+                            "length": 2
+                        },
+                        "instructions": {
+                            "type": "uint8[]",
+                            "value": inst_array,
+                            "offset": curr + pts_length + 2,
+                            "length": inst_len as u32
+                        },
+                        "flags": {
+                            "type": "uint8[]",
+                            "value": flags_array,
+                            "offset": flags_offset,
+                            "length": flags_bytes.len()
+                        },
+                        "xCoordinates": {
+                            "type": "(uint8|int16)[]",
+                            "value": x_coords_array,
+                            "offset": x_offset,
+                            "length": x_coords.len()
+                        },
+                        "yCoordinates": {
+                            "type": "(uint8|int16)[]",
+                            "value": y_coords_array,
+                            "offset": y_offset,
+                            "length": y_coords.len()
+                        },
+                    });
+
+                    let simple_len = total_length.saturating_sub(10);
+                    let simple_val = json!({
+                        "type": "SimpleGlyph",
+                        "value": simple_obj,
+                        "offset": curr,
+                        "length": simple_len
+                    });
+
+                    glyph_data
+                        .as_object_mut()
+                        .unwrap()
+                        .insert("simple".to_string(), simple_val);
+                }
+                read_fonts::tables::glyf::Glyph::Composite(composite) => {
+                    let data = composite.component_data();
+                    let (components, comp_len, has_instructions) =
+                        parse_composite_components(data, curr + 10);
+                    let mut composite_obj_map = serde_json::Map::new();
+                    composite_obj_map.insert(
+                        "components".to_string(),
+                        json!({
+                            "type": "ComponentGlyph[]",
+                            "value": components,
+                            "offset": curr + 10,
+                            "length": comp_len
+                        }),
+                    );
+
+                    if has_instructions {
+                        let inst_offset = comp_len as usize;
+                        if inst_offset + 2 <= data.len() {
+                            let num_instr =
+                                u16::from_be_bytes([data[inst_offset], data[inst_offset + 1]]);
+                            composite_obj_map.insert(
+                                "instructionLength".to_string(),
+                                json!({
+                                    "type": "uint16",
+                                    "value": num_instr,
+                                    "offset": curr + 10 + inst_offset as u32,
+                                    "length": 2
+                                }),
+                            );
+
+                            let instr_len = num_instr as usize;
+                            if inst_offset + 2 + instr_len <= data.len() {
+                                let instr_data =
+                                    &data[inst_offset + 2..inst_offset + 2 + instr_len];
+                                let instr_array: Vec<_> = instr_data.iter().enumerate().map(|(idx, &val)| {
+                                    json!({
+                                        "type": "uint8",
+                                        "value": val,
+                                        "offset": curr + 10 + inst_offset as u32 + 2 + idx as u32,
+                                        "length": 1
+                                    })
+                                }).collect();
+
+                                composite_obj_map.insert(
+                                    "instructions".to_string(),
+                                    json!({
+                                        "type": "uint8[]",
+                                        "value": instr_array,
+                                        "offset": curr + 10 + inst_offset as u32 + 2,
+                                        "length": instr_len
+                                    }),
+                                );
+                            }
+                        }
+                    }
+
+                    let composite_obj = json!(composite_obj_map);
+
+                    let composite_len = total_length.saturating_sub(10);
+                    let composite = json!({
+                        "type": "CompositeGlyph",
+                        "value": composite_obj,
+                        "offset": curr,
+                        "length": composite_len
+                    });
+
+                    glyph_data
+                        .as_object_mut()
+                        .unwrap()
+                        .insert("composite".to_string(), composite);
+                }
+            }
+
+            glyph_data
+        }
+        Ok(None) => {
+            json!({})
+        }
+        Err(e) => {
+            json!({
+                "error": e.to_string(),
+            })
+        }
+    }
 }
 
 fn resolve_coords_len(data: &[u8], points_total: u16) -> Result<(u32, u32, u32), ()> {

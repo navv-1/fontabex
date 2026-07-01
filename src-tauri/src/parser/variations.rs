@@ -253,9 +253,18 @@ fn parse_region_axis_coordinates(axis: &RegionAxisCoordinates, offset: usize) ->
 fn parse_item_variation_data(data: &ItemVariationData<'_>, offset: usize) -> Value {
     let region_indexes_offset = offset + ITEM_VARIATION_DATA_HEADER_SIZE;
     let delta_sets_offset = region_indexes_offset + data.region_indexes().len() * 2;
+    let word_delta_count = data.word_delta_count();
+    let long_words = (word_delta_count & 0x8000) != 0;
+    let count = word_delta_count & 0x7FFF;
+    let mut word_delta_field = parsed_field("uint16", word_delta_count, offset + 2, 2);
+    word_delta_field["summary"] = json!(format!(
+        "{:#06X} (LONG_WORDS: {}, count: {})",
+        word_delta_count, long_words, count
+    ));
+
     json!({
         "itemCount": parsed_field("uint16", data.item_count(), offset, 2),
-        "wordDeltaCount": parsed_field("uint16", data.word_delta_count(), offset + 2, 2),
+        "wordDeltaCount": word_delta_field,
         "regionIndexCount": parsed_field("uint16", data.region_index_count(), offset + 4, 2),
         "regionIndexes": {
             "type": "uint16[]",
@@ -271,15 +280,48 @@ fn parse_item_variation_data(data: &ItemVariationData<'_>, offset: usize) -> Val
             "length": data.region_indexes().len() * 2
         },
         "deltaSets": {
-            "type": "int32[]",
+            "type": "DeltaSet[]",
             "value": (0..data.item_count())
                 .map(|index| {
+                    let row_len = data.get_delta_row_len();
+                    let row_offset = delta_sets_offset + index as usize * row_len;
+                    let delta_type = if long_words {
+                        "(int32 | int16)[]"
+                    } else {
+                        "(int16 | int8)[]"
+                    };
+
+                    let mut current_item_offset = row_offset;
+                    let parsed_deltas: Vec<Value> = data
+                        .delta_set(index)
+                        .enumerate()
+                        .map(|(i, delta)| {
+                            let is_long = i < count as usize;
+                            let (item_type, item_len) = if long_words {
+                                if is_long { ("int32", 4) } else { ("int16", 2) }
+                            } else {
+                                if is_long { ("int16", 2) } else { ("int8", 1) }
+                            };
+
+                            let field = parsed_field(item_type, delta, current_item_offset, item_len);
+                            current_item_offset += item_len;
+                            field
+                        })
+                        .collect();
+
                     json!({
-                        "type": "int32[]",
+                        "type": "DeltaSet",
                         "name": format!("Delta set {index}"),
-                        "value": data.delta_set(index).collect::<Vec<_>>(),
-                        "offset": delta_sets_offset + index as usize * data.get_delta_row_len(),
-                        "length": data.get_delta_row_len()
+                        "value": {
+                            "deltaData": {
+                                "type": delta_type,
+                                "value": parsed_deltas,
+                                "offset": row_offset,
+                                "length": row_len
+                            }
+                        },
+                        "offset": row_offset,
+                        "length": row_len
                     })
                 })
                 .collect::<Vec<_>>(),

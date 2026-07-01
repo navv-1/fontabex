@@ -486,6 +486,156 @@
   });
 
   let fetchingLazyItems = $state(false);
+
+  let searchCurrentMatchIndex = $state<number | null>(null);
+  let isSearchingIndex = $state(false);
+  let virtualListRef = $state<any>(null);
+
+  async function performSearch(forward: boolean) {
+    if (!normalizedParsedSearch) {
+      searchCurrentMatchIndex = null;
+      return;
+    }
+
+    isSearchingIndex = true;
+    try {
+      const isWrappedLazy =
+        currentParsedPageRaw && currentParsedPageRaw._is_lazy_array;
+
+      let startIdx = searchCurrentMatchIndex ?? 0;
+
+      if (isWrappedLazy) {
+        let backendStartIdx = startIdx;
+        if (searchCurrentMatchIndex !== null) {
+          if (forward) backendStartIdx++;
+          else backendStartIdx = Math.max(0, backendStartIdx - 1);
+        }
+
+        // Lazy table - call backend
+        const raw = currentParsedPageRaw;
+        const res = await invoke<any>("search_parsed_index", {
+          path: fontPath,
+          command: raw.lazy_command,
+          offset: backendStartIdx,
+          searchTarget: activeParsedSearchTarget,
+          searchQuery: normalizedParsedSearch,
+          forward,
+        });
+
+        if (res.index !== null) {
+          let targetNeedsFetch = false;
+          if (res.index >= raw.loaded.length) {
+            targetNeedsFetch = true;
+            // Pad array up to res.index
+            let gap = res.index - raw.loaded.length;
+            let dummies = Array.from({ length: gap }).map((_, i) => ({
+              rowIndex: raw.loaded.length + i,
+              data: { _dummy: true },
+            }));
+            raw.loaded.push(...dummies);
+          } else if (raw.loaded[res.index]?.data?._dummy) {
+            targetNeedsFetch = true;
+          }
+
+          if (targetNeedsFetch) {
+            const offset = Math.max(0, res.index - 50);
+            const chunk = await invoke<any>("parse_lazy_batch", {
+              path: fontPath,
+              command: raw.lazy_command,
+              offset: offset,
+              limit: 100,
+              searchTarget: null,
+              searchQuery: null,
+            });
+
+            // Place the fetched chunk into raw.loaded
+            for (let i = 0; i < chunk.items.length; i++) {
+              raw.loaded[offset + i] = chunk.items[i];
+            }
+
+            if (parsedPageStack.length > 0) {
+              parsedPageStack = [...parsedPageStack];
+            } else {
+              parsedData = { ...parsedData };
+            }
+
+            // Wait a tick for the DOM to update before scrolling
+            await new Promise((r) => setTimeout(r, 0));
+          }
+
+          searchCurrentMatchIndex = res.index;
+          virtualListRef?.scrollToIndex(res.index, "smooth", "center");
+        } else if (res.next_offset !== null && res.next_offset !== startIdx) {
+          // Not found in remaining
+        }
+      } else {
+        // Normal table - search client-side
+        let isObjectArray = currentParsedObjectRows.length > 0;
+        let i = startIdx;
+        if (searchCurrentMatchIndex === null) {
+          if (forward) i--;
+          else i++;
+        }
+        let scanned = 0;
+        let found = null;
+        let len = isObjectArray
+          ? currentParsedObjectRowsWithIndex.length
+          : filteredParsedEntries.length;
+
+        if (len === 0) return;
+
+        while (scanned < len) {
+          if (forward) {
+            i++;
+            if (i >= len) i = 0;
+          } else {
+            i--;
+            if (i < 0) i = len - 1;
+          }
+          scanned++;
+          if (isObjectArray) {
+            let item = currentParsedObjectRowsWithIndex[i];
+            if (matchesParsedObjectRow(item.row, item.rowIndex)) {
+              found = i;
+              break;
+            }
+          } else {
+            let item = filteredParsedEntries[i];
+            if (matchesParsedEntry(item.entry, item.rowIndex)) {
+              found = i;
+              break;
+            }
+          }
+        }
+        if (found !== null) {
+          searchCurrentMatchIndex = found;
+          virtualListRef?.scrollToIndex(found, "smooth", "center");
+        }
+      }
+    } catch (err) {
+      console.error("Search failed:", err);
+    } finally {
+      isSearchingIndex = false;
+    }
+  }
+
+  function onSearchKeydown(e: KeyboardEvent) {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      performSearch(!e.shiftKey);
+    }
+  }
+
+  // Watch search query changes to reset match
+  $effect(() => {
+    if (normalizedParsedSearch) {
+      // Reset when query changes
+      searchCurrentMatchIndex = null;
+    } else {
+      searchCurrentMatchIndex = null;
+    }
+  });
+
   async function loadMoreLazyItems() {
     if (fetchingLazyItems) return;
     const raw = currentParsedPageRaw;
@@ -495,25 +645,24 @@
 
     fetchingLazyItems = true;
     try {
-      const offset = raw.loaded.length;
       const limit = 100;
-      const nextBatch = await invoke<any>("parse_lazy_batch", {
+      const res = await invoke<any>("parse_lazy_batch", {
         path: fontPath,
         command: raw.lazy_command,
-        offset,
+        offset: raw.loaded.length,
         limit,
+        searchTarget: null,
+        searchQuery: null,
       });
 
-      raw.loaded = [...raw.loaded, ...nextBatch];
-
-      // Force reactivity
+      raw.loaded = [...raw.loaded, ...res.items];
       if (parsedPageStack.length > 0) {
         parsedPageStack = [...parsedPageStack];
       } else {
         parsedData = { ...parsedData };
       }
-    } catch (e) {
-      console.error("Failed to load lazy items", e);
+    } catch (err) {
+      console.error(err);
     } finally {
       fetchingLazyItems = false;
     }
@@ -533,11 +682,16 @@
 
   let currentParsedPageIsArray = $derived(Array.isArray(currentParsedPage));
 
-  let currentParsedObjectRows = $derived.by(() => {
+  let currentParsedObjectRowsWithIndex = $derived.by(() => {
     if (!Array.isArray(currentParsedPage)) return [];
+
+    const isWrappedLazy =
+      currentParsedPageRaw && currentParsedPageRaw._is_lazy_array;
+
     if (
       !currentParsedPage.every((item) => {
-        const rawItem = getParsedRawValue(item);
+        let actualItem = isWrappedLazy ? item.data : item;
+        const rawItem = getParsedRawValue(actualItem);
         return (
           rawItem !== null &&
           typeof rawItem === "object" &&
@@ -547,14 +701,26 @@
     ) {
       return [];
     }
-    return currentParsedPage.map(getParsedRawValue) as Record<string, any>[];
+    return currentParsedPage.map((item, arrayIndex) => {
+      let actualItem = isWrappedLazy ? item.data : item;
+      let row = getParsedRawValue(actualItem) as Record<string, any>;
+      let rowIndex = isWrappedLazy
+        ? item.rowIndex
+        : (item.rowIndex ?? arrayIndex);
+      return { row, rowIndex };
+    });
   });
+
+  let currentParsedObjectRows = $derived(
+    currentParsedObjectRowsWithIndex.map((x) => x.row),
+  );
 
   let currentParsedObjectColumns = $derived.by(() => {
     const columns: string[] = [];
     const seen = new Set<string>();
     for (const row of currentParsedObjectRows) {
       for (const key of Object.keys(row)) {
+        if (key === "_dummy") continue;
         if (key === "name") continue;
         if (!seen.has(key)) {
           seen.add(key);
@@ -744,6 +910,10 @@
   }
 
   let parsedSearchTargetOptions = $derived.by(() => {
+    if (selectedTable?.tag === "glyf" && parsedPageStack.length === 0) {
+      return [{ value: "index", label: "Index" }];
+    }
+
     if (currentParsedObjectRows.length > 0) {
       return [
         { value: "index", label: "Index" },
@@ -820,7 +990,7 @@
   function matchesParsedObjectRow(row: Record<string, any>, rowIndex: number) {
     if (!normalizedParsedSearch) return true;
     if (activeParsedSearchTarget === "index") {
-      return matchesParsedSearchText(rowIndex);
+      return String(rowIndex) === normalizedParsedSearch;
     }
     if (activeParsedSearchTarget === "name") {
       return matchesParsedSearchText(row.name);
@@ -842,7 +1012,7 @@
     if (!normalizedParsedSearch) return true;
     const [key, value] = entry;
     if (activeParsedSearchTarget === "index") {
-      return matchesParsedSearchText(rowIndex);
+      return String(rowIndex) === normalizedParsedSearch;
     }
     if (activeParsedSearchTarget === "type") {
       return matchesParsedSearchText(getParsedType(value));
@@ -861,16 +1031,10 @@
     ].some(matchesParsedSearchText);
   }
 
-  let filteredParsedObjectRows = $derived.by(() => {
-    return currentParsedObjectRows
-      .map((row, rowIndex) => ({ row, rowIndex }))
-      .filter(({ row, rowIndex }) => matchesParsedObjectRow(row, rowIndex));
-  });
+  let filteredParsedObjectRows = $derived(currentParsedObjectRowsWithIndex);
 
   let filteredParsedEntries = $derived.by(() => {
-    return currentParsedEntries
-      .map((entry, rowIndex) => ({ entry, rowIndex }))
-      .filter(({ entry, rowIndex }) => matchesParsedEntry(entry, rowIndex));
+    return currentParsedEntries.map((entry, rowIndex) => ({ entry, rowIndex }));
   });
 
   let currentParsedTotalCount = $derived.by(() => {
@@ -895,7 +1059,11 @@
 
   function isLinkedParsedValue(value: any) {
     const rawValue = getParsedRawValue(value);
-    return rawValue !== null && typeof rawValue === "object";
+    if (rawValue !== null && typeof rawValue === "object") {
+      if (Array.isArray(rawValue) && rawValue.length === 0) return false;
+      return true;
+    }
+    return false;
   }
 
   function isSelectedParsedField(value: any) {
@@ -913,6 +1081,7 @@
     arrayItemType: string | undefined = undefined,
   ) {
     parsedPageStack = [...parsedPageStack, { keyName, data, arrayItemType }];
+    triggerReSearch();
   }
 
   function selectParsedFieldBytes(value: any) {
@@ -936,10 +1105,20 @@
 
   function popParsedPage() {
     parsedPageStack = parsedPageStack.slice(0, -1);
+    triggerReSearch();
   }
 
   function goToParsedPage(index: number) {
     parsedPageStack = parsedPageStack.slice(0, index);
+    triggerReSearch();
+  }
+
+  async function triggerReSearch() {
+    searchCurrentMatchIndex = null;
+    if (parsedSearch) {
+      await new Promise((r) => setTimeout(r, 0));
+      performSearch(true);
+    }
   }
 
   function handleSelectBytes(offset: number, length: number) {
@@ -1085,11 +1264,7 @@
 
             <div class="parsed-search" role="search">
               <span class="table-badge parsed-count-badge">
-                {#if normalizedParsedSearch}
-                  {currentParsedVisibleCount}/{currentParsedTotalCount}
-                {:else}
-                  {currentParsedTotalCount}
-                {/if}
+                {currentParsedTotalCount}
               </span>
               <div class="parsed-search-group">
                 <div
@@ -1165,10 +1340,14 @@
                     class="parsed-search-input"
                     type="text"
                     bind:value={parsedSearch}
+                    onkeydown={onSearchKeydown}
                     placeholder={activeParsedSearchTarget === "index"
-                      ? "0-18"
+                      ? currentParsedTotalCount > 0
+                        ? `0-${currentParsedTotalCount - 1}`
+                        : "0"
                       : "Search..."}
                     aria-label="Search parsed data"
+                    spellcheck="false"
                   />
                   {#if parsedSearch}
                     <button
@@ -1182,6 +1361,28 @@
                   {/if}
                 </div>
               </div>
+              {#if parsedSearch}
+                <div class="nav-btn-group">
+                  <button
+                    class="nav-btn"
+                    onclick={() => performSearch(false)}
+                    type="button"
+                    aria-label="Previous Match"
+                    title="Previous Match (Shift+Enter)"
+                  >
+                    <svg viewBox="0 0 24 24"><path d="m18 15-6-6-6 6" /></svg>
+                  </button>
+                  <button
+                    class="nav-btn"
+                    onclick={() => performSearch(true)}
+                    type="button"
+                    aria-label="Next Match"
+                    title="Next Match (Enter)"
+                  >
+                    <svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6" /></svg>
+                  </button>
+                </div>
+              {/if}
             </div>
           </div>
           {#if selectedTableSpecUrl}
@@ -1320,6 +1521,7 @@
                     </div>
                   {:else}
                     <VirtualList
+                      bind:this={virtualListRef}
                       class="virtual-data-body"
                       items={filteredParsedObjectRows}
                       height="auto"
@@ -1329,54 +1531,109 @@
                       {#snippet children(item)}
                         {@const row = item.row}
                         {@const rowIndex = item.rowIndex}
-                        <div class="virtual-data-row" role="row">
-                          <div class="virtual-data-cell col-index" role="cell">
+                        {@const isIndexMatch =
+                          rowIndex === searchCurrentMatchIndex &&
+                          (activeParsedSearchTarget === "index" ||
+                            (activeParsedSearchTarget === "all" &&
+                              normalizedParsedSearch &&
+                              String(rowIndex).includes(
+                                normalizedParsedSearch,
+                              )))}
+                        <div
+                          class="virtual-data-row {rowIndex ===
+                          searchCurrentMatchIndex
+                            ? 'search-match-highlight'
+                            : ''}"
+                          role="row"
+                        >
+                          <div
+                            class="virtual-data-cell col-index {isIndexMatch
+                              ? 'search-match-cell'
+                              : ''}"
+                            role="cell"
+                          >
                             {rowIndex}
                           </div>
-                          {#if currentParsedObjectHasKeys}
-                            <div class="virtual-data-cell col-key" role="cell">
-                              {row.name ?? ""}
-                            </div>
-                          {/if}
-                          {#each currentParsedObjectColumns as column}
-                            {@const cellValue = row[column]}
-                            {@const rawCellValue = getParsedRawValue(cellValue)}
-                            <!-- svelte-ignore a11y_click_events_have_key_events -->
-                            <!-- svelte-ignore a11y_interactive_supports_focus -->
+                          {#if row._dummy}
                             <div
-                              class="virtual-data-cell col-val {isParsedField(
-                                cellValue,
-                              )
-                                ? 'clickable-cell'
-                                : ''} {getParsedValueClass(
-                                cellValue,
-                              )} {isSelectedParsedField(cellValue)
-                                ? 'selected-data-cell'
-                                : ''}"
-                              role="cell"
-                              onclick={() => handleParsedCellClick(cellValue)}
+                              class="virtual-data-cell"
+                              style="grid-column: 2 / -1; color: var(--text-color); opacity: 0.5; justify-content: center; font-style: italic;"
                             >
-                              {#if cellValue === undefined}
-                                <span class="empty-cell">-</span>
-                              {:else if isLinkedParsedValue(rawCellValue)}
-                                <button
-                                  class="value-link"
-                                  type="button"
-                                  onclick={(event) => {
-                                    event.stopPropagation();
-                                    handleParsedCellLink(
-                                      `${rowIndex}.${column}`,
-                                      cellValue,
-                                    );
-                                  }}
-                                >
-                                  {formatParsedValue(cellValue)}
-                                </button>
-                              {:else}
-                                {formatParsedValue(cellValue)}
-                              {/if}
+                              (Skipped items)
                             </div>
-                          {/each}
+                          {:else}
+                            {#if currentParsedObjectHasKeys}
+                              {@const isNameMatch =
+                                rowIndex === searchCurrentMatchIndex &&
+                                (activeParsedSearchTarget === "name" ||
+                                  (activeParsedSearchTarget === "all" &&
+                                    (row.name ?? "")
+                                      .toLowerCase()
+                                      .includes(normalizedParsedSearch)))}
+                              <div
+                                class="virtual-data-cell col-key {isNameMatch
+                                  ? 'search-match-cell'
+                                  : ''}"
+                                role="cell"
+                              >
+                                {row.name ?? ""}
+                              </div>
+                            {/if}
+                            {#each currentParsedObjectColumns as column}
+                              {@const cellValue = row[column]}
+                              {@const rawCellValue =
+                                getParsedRawValue(cellValue)}
+                              {@const cellString = (
+                                (JSON.stringify(rawCellValue) || "") +
+                                " " +
+                                formatParsedValue(cellValue)
+                              ).toLowerCase()}
+                              {@const isCellMatch =
+                                rowIndex === searchCurrentMatchIndex &&
+                                (activeParsedSearchTarget ===
+                                  `column:${column}` ||
+                                  (activeParsedSearchTarget === "all" &&
+                                    normalizedParsedSearch &&
+                                    cellString.includes(
+                                      normalizedParsedSearch,
+                                    )))}
+                              <!-- svelte-ignore a11y_click_events_have_key_events -->
+                              <!-- svelte-ignore a11y_interactive_supports_focus -->
+                              <div
+                                class="virtual-data-cell col-val {isCellMatch
+                                  ? 'search-match-cell'
+                                  : ''} {isParsedField(cellValue)
+                                  ? 'clickable-cell'
+                                  : ''} {getParsedValueClass(
+                                  cellValue,
+                                )} {isSelectedParsedField(cellValue)
+                                  ? 'selected-data-cell'
+                                  : ''}"
+                                role="cell"
+                                onclick={() => handleParsedCellClick(cellValue)}
+                              >
+                                {#if cellValue === undefined}
+                                  <span class="empty-cell">-</span>
+                                {:else if isLinkedParsedValue(rawCellValue)}
+                                  <button
+                                    class="value-link"
+                                    type="button"
+                                    onclick={(event) => {
+                                      event.stopPropagation();
+                                      handleParsedCellLink(
+                                        `${rowIndex}.${column}`,
+                                        cellValue,
+                                      );
+                                    }}
+                                  >
+                                    {formatParsedValue(cellValue)}
+                                  </button>
+                                {:else}
+                                  {formatParsedValue(cellValue)}
+                                {/if}
+                              </div>
+                            {/each}
+                          {/if}
                         </div>
                       {/snippet}
                     </VirtualList>
@@ -1471,6 +1728,7 @@
                     </div>
                   {:else}
                     <VirtualList
+                      bind:this={virtualListRef}
                       class="virtual-data-body"
                       items={filteredParsedEntries}
                       height="auto"
@@ -1484,37 +1742,85 @@
                         {@const value = entry[1]}
                         {@const rawValue = getParsedRawValue(value)}
                         {@const keyName = getParsedEntryKey(key, value)}
+                        {@const cellString = (
+                          (JSON.stringify(rawValue) || "") +
+                          " " +
+                          formatParsedValue(value)
+                        ).toLowerCase()}
+                        {@const isValueMatch =
+                          rowIndex === searchCurrentMatchIndex &&
+                          (activeParsedSearchTarget === "value" ||
+                            (activeParsedSearchTarget === "all" &&
+                              normalizedParsedSearch &&
+                              cellString.includes(normalizedParsedSearch)))}
                         <!-- svelte-ignore a11y_click_events_have_key_events -->
                         <!-- svelte-ignore a11y_interactive_supports_focus -->
                         <div
                           class="virtual-data-row {isSelectedParsedField(value)
                             ? 'selected-data-row'
+                            : ''} {rowIndex === searchCurrentMatchIndex
+                            ? 'search-match-highlight'
                             : ''}"
                           role="row"
                           onclick={() => handleParsedCellClick(value)}
                         >
                           {#if currentParsedPageIsArray}
+                            {@const isIndexMatch =
+                              rowIndex === searchCurrentMatchIndex &&
+                              (activeParsedSearchTarget === "index" ||
+                                (activeParsedSearchTarget === "all" &&
+                                  normalizedParsedSearch &&
+                                  String(rowIndex).includes(
+                                    normalizedParsedSearch,
+                                  )))}
                             <div
-                              class="virtual-data-cell col-index"
+                              class="virtual-data-cell col-index {isIndexMatch
+                                ? 'search-match-cell'
+                                : ''}"
                               role="cell"
                             >
                               {rowIndex}
                             </div>
                           {/if}
                           {#if currentParsedShowsTypeColumn}
-                            <div class="virtual-data-cell col-type" role="cell">
+                            {@const typeStr =
+                              getParsedType(value).toLowerCase()}
+                            {@const isTypeMatch =
+                              rowIndex === searchCurrentMatchIndex &&
+                              (activeParsedSearchTarget === "type" ||
+                                (activeParsedSearchTarget === "all" &&
+                                  normalizedParsedSearch &&
+                                  typeStr.includes(normalizedParsedSearch)))}
+                            <div
+                              class="virtual-data-cell col-type {isTypeMatch
+                                ? 'search-match-cell'
+                                : ''}"
+                              role="cell"
+                            >
                               {getParsedType(value)}
                             </div>
                           {/if}
                           {#if currentParsedShowsNameColumn}
-                            <div class="virtual-data-cell col-key" role="cell">
+                            {@const nameStr = keyName.toLowerCase()}
+                            {@const isNameMatch =
+                              rowIndex === searchCurrentMatchIndex &&
+                              (activeParsedSearchTarget === "name" ||
+                                (activeParsedSearchTarget === "all" &&
+                                  normalizedParsedSearch &&
+                                  nameStr.includes(normalizedParsedSearch)))}
+                            <div
+                              class="virtual-data-cell col-key {isNameMatch
+                                ? 'search-match-cell'
+                                : ''}"
+                              role="cell"
+                            >
                               {keyName}
                             </div>
                           {/if}
                           <div
-                            class="virtual-data-cell col-val {isParsedField(
-                              value,
-                            )
+                            class="virtual-data-cell col-val {isValueMatch
+                              ? 'search-match-cell'
+                              : ''} {isParsedField(value)
                               ? 'clickable-cell'
                               : ''} {getParsedValueClass(
                               value,

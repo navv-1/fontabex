@@ -64,6 +64,7 @@
         placeholder="Filter tables..."
         bind:value={sidebarSearch}
         class="sidebar-search-input"
+        spellcheck="false"
       />
       {#if sidebarSearch}
         <button

@@ -34,6 +34,7 @@ export function formatValue(value: unknown): string {
   if (value === null) return "null";
   if (typeof value === "object") {
     if (Array.isArray(value)) {
+      if (value.length === 0) return "[]";
       return `[${value.length} ${isRecordArray(value) ? "records" : "items"}]`;
     }
     const keys = Object.keys(value);

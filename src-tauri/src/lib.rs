@@ -155,12 +155,36 @@ fn parse_lazy_batch(
     command: String,
     offset: usize,
     limit: usize,
+    search_target: Option<String>,
+    search_query: Option<String>,
 ) -> Result<serde_json::Value, String> {
     let bytes = std::fs::read(&path).map_err(|e| e.to_string())?;
     let font = read_fonts::FontRef::new(&bytes).map_err(|e| e.to_string())?;
 
     match command.as_str() {
-        "parse_glyf_batch" => parser::glyf::parse_batch(&font, offset, limit),
+        "parse_glyf_batch" => {
+            parser::glyf::parse_batch(&font, offset, limit, search_target, search_query)
+        }
+        _ => Err(format!("Unknown lazy command: {}", command)),
+    }
+}
+
+#[tauri::command]
+fn search_parsed_index(
+    path: String,
+    command: String,
+    offset: usize,
+    search_target: Option<String>,
+    search_query: Option<String>,
+    forward: bool,
+) -> Result<serde_json::Value, String> {
+    let bytes = std::fs::read(&path).map_err(|e| e.to_string())?;
+    let font = read_fonts::FontRef::new(&bytes).map_err(|e| e.to_string())?;
+
+    match command.as_str() {
+        "parse_glyf_batch" => {
+            parser::glyf::search_index(&font, offset, search_target, search_query, forward)
+        }
         _ => Err(format!("Unknown lazy command: {}", command)),
     }
 }
@@ -175,6 +199,7 @@ pub fn run() {
             get_table_bytes,
             parser::parse_specific_table,
             parse_lazy_batch,
+            search_parsed_index,
             #[cfg(windows)]
             show_native_window_menu,
         ])
