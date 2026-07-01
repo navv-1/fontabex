@@ -989,3 +989,35 @@ th.col-val {
     transparent
   ) !important;
 }
+
+/* Progress Stripe Loading State */
+.loading-progress-stripe {
+  height: 2px;
+  width: 100%;
+  background-color: transparent;
+  position: relative;
+  overflow: hidden;
+  flex-shrink: 0;
+  z-index: 10;
+}
+
+.loading-progress-stripe::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 30%;
+  background-color: var(--primary);
+  border-radius: 2px;
+  animation: loading-stripe-anim 1.5s infinite ease-in-out;
+}
+
+@keyframes loading-stripe-anim {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(350%);
+  }
+}

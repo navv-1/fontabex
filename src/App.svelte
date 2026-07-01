@@ -1398,11 +1398,13 @@
             </div>
           {/if}
 
+          {#if dataLoading}
+            <div class="loading-progress-stripe"></div>
+          {/if}
+
           <!-- LEFT PANE: Parsed Data Grid -->
           <div class="parsed-pane">
-            {#if dataLoading}
-              <div class="loading-state">Loading data...</div>
-            {:else if parsedError}
+            {#if parsedError}
               <div class="error-container">
                 <div class="error-title">{parsedError}</div>
                 <p class="error-subtitle">

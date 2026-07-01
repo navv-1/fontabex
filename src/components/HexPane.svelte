@@ -104,12 +104,14 @@
     </span>
   </div>
 
+  {#if dataLoading}
+    <div class="loading-progress-stripe"></div>
+  {/if}
+
   <div class="hex-scroll-container">
     <div class="hex-block-wrapper">
       <div class="hex-virtual-wrapper">
-        {#if dataLoading}
-          <div class="hex-loading">Loading bytes...</div>
-        {:else if hexRows.length > 0}
+        {#if hexRows.length > 0}
           <VirtualList
             bind:this={virtualListRef}
             items={hexRows as any}
