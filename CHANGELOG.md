@@ -1,5 +1,38 @@
 # Changelog
 
+## 0.3.1 - 2026-07-01
+
+### Added
+- Added sleek indeterminate loading stripes to the parsed and hex panes to indicate background data fetching.
+- Added dynamic upper-bound index limits to the search input placeholders based on table size.
+
+### Changed
+- Improved the Hex Viewer selection styling specificity so the blue active selection highlight is never overwritten by passive search highlights.
+- Updated the variation `deltaSets` parsing to conform perfectly to the OpenType spec (producing `DeltaSet` records with fully unpackaged, explicitly typed, and selectable `ParsedField` elements).
+- Disabled spellchecking across all search inputs.
+- Empty arrays `[]` now render correctly as plain text without an unclickable value-link.
+
+### Fixed
+- Fixed search iteration logic that was entirely skipping index `0`.
+- Fixed the backend search logic which could get permanently stuck when finding the first match in massive lazy tables.
+- Fixed specific column targeting for Svelte cell highlighting and Rust `glyf` data extraction.
+- Fixed the `Index` column search logic to enforce exact numeric matching instead of partial string matching.
+
+## 0.3.0 - 2026-06-30
+
+### Added
+- Added `glyf` and `loca` table parsers with backend lazy-loading support for massive fonts.
+- Added vertical metrics table parsers (`vhea`, `vmtx`, etc.).
+- Added `HVAR` and `MVAR` table parsers.
+
+### Changed
+- Massively improved Hex pane scroll rendering performance for huge tables.
+- Improved Hex pane auto-scroll behavior to use nearest-edge snapping.
+- Improved object value inline formatting by adding ellipsis truncation for large objects.
+
+### Fixed
+- Fixed `itemVariationData` selection bounds and simplified mapData representation.
+
 ## 0.2.0 - 2026-06-22
 
 ### Added
