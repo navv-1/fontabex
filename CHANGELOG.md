@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.4.0 - 2026-07-05
+
+### Added
+
+- Added `gvar` and `cvar` table parsers with fully structured tuple variation headers and deltas.
+- Added app version display to the Welcome page.
+- Added a GitHub repository link to the Welcome page titlebar.
+
+### Fixed
+
+- Fixed various backend clippy warnings related to string parsing.
+
 ## 0.3.1 - 2026-07-01
 
 ### Added
@@ -26,7 +38,7 @@
 ### Added
 
 - Added `glyf` and `loca` table parsers with backend lazy-loading support for massive fonts.
-- Added `vhea`, `vmtx`, `vvar` table parsers.
+- Added `vhea`, `vmtx`, `VVAR` table parsers.
 - Added `HVAR` and `MVAR` table parsers.
 
 ### Changed
