@@ -3,8 +3,10 @@ use serde_json::Value;
 
 pub mod avar;
 pub mod cmap;
+pub mod cvar;
 pub mod fvar;
 pub mod glyf;
+pub mod gvar;
 pub mod head;
 pub mod hhea;
 pub mod hmtx;
@@ -48,6 +50,8 @@ pub fn parse_specific_table(path: String, tag: String) -> Result<Value, String> 
         "STAT" => stat::parse(&font),
         "loca" => loca::parse(&font),
         "glyf" => glyf::parse(&font),
+        "gvar" => gvar::parse(&font),
+        "cvar" => cvar::parse(&font),
         _ => Err(format!(
             "Parsing for table '{}' is not implemented yet.",
             tag

@@ -61,6 +61,11 @@
 
   --code-key: #d97706;
   --code-value: #2563eb;
+  --code-string: #059669;
+  --code-boolean: #e11d48;
+  --code-array: #0891b2;
+  --code-record: #9333ea;
+  --code-record-array: #c026d3;
 
   --scroll-thumb: #cccccc;
   --scroll-thumb-hover: #8f8f8f;
@@ -88,6 +93,11 @@
 
   --code-key: #fbbf24;
   --code-value: #7aa2f7;
+  --code-string: #34d399;
+  --code-boolean: #fb7185;
+  --code-array: #22d3ee;
+  --code-record: #c084fc;
+  --code-record-array: #e879f9;
 
   --scroll-thumb: #353535;
   --scroll-thumb-hover: #8a8a8a;
@@ -686,11 +696,11 @@ body {
 }
 
 .col-val.value-string {
-  color: #059669;
+  color: var(--code-string);
 }
 
 .col-val.value-boolean {
-  color: #7c3aed;
+  color: var(--code-boolean);
 }
 
 .col-val.value-null,
@@ -699,11 +709,15 @@ body {
 }
 
 .col-val.value-array {
-  color: #0891b2;
+  color: var(--code-array);
 }
 
 .col-val.value-record {
-  color: #9333ea;
+  color: var(--code-record);
+}
+
+.col-val.value-record-array {
+  color: var(--code-record-array);
 }
 
 .virtual-empty-row {

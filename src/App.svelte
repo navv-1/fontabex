@@ -16,6 +16,7 @@
     formatParsedValue,
     getParsedRawValue,
     isParsedField,
+    isRecordArray,
   } from "./lib/parsedFormatting";
 
   const UI_STATE_STORAGE_KEY = "fontabex.uiState.v1";
@@ -430,7 +431,10 @@
   function getParsedValueClass(value: any) {
     const rawValue = getParsedRawValue(value);
     if (rawValue === null) return "value-null";
-    if (Array.isArray(rawValue)) return "value-array";
+    if (Array.isArray(rawValue)) {
+      if (isRecordArray(rawValue)) return "value-record-array";
+      return "value-array";
+    }
     switch (typeof rawValue) {
       case "number":
         return "value-number";
@@ -760,9 +764,7 @@
     !currentParsedPageIsArray || currentParsedEntriesHaveNames,
   );
 
-  let currentParsedShowsTypeColumn = $derived(
-    !currentParsedPageIsArray || Boolean(currentParsedArrayItemType),
-  );
+  let currentParsedShowsTypeColumn = true;
 
   const COL_MIN = 64;
   const COL_FLEX = "1fr";
@@ -1614,7 +1616,7 @@
                                 role="cell"
                                 onclick={() => handleParsedCellClick(cellValue)}
                               >
-                                {#if cellValue === undefined}
+                                {#if cellValue == null}
                                   <span class="empty-cell">-</span>
                                 {:else if isLinkedParsedValue(rawCellValue)}
                                   <button

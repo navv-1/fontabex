@@ -134,8 +134,8 @@ pub fn search_index(
     }
     let query = query_opt.unwrap();
     let target_str = search_target.as_deref().unwrap_or("all");
-    let target_key = if target_str.starts_with("column:") {
-        &target_str["column:".len()..]
+    let target_key = if let Some(stripped) = target_str.strip_prefix("column:") {
+        stripped
     } else {
         target_str
     };
@@ -248,7 +248,7 @@ fn parse_single_glyph(
                     let inst_len = simple.instruction_length();
 
                     let data = simple.glyph_data();
-                    let n_points = end_pts.last().map(|last| *last as u16 + 1).unwrap_or(0);
+                    let n_points = end_pts.last().map(|last| *last + 1).unwrap_or(0);
                     let mut flags_bytes = Vec::new();
                     let mut x_coords = Vec::new();
                     let mut y_coords = Vec::new();
@@ -620,17 +620,15 @@ fn parse_coordinate_array(flags: &[u8], coords: &[u8], is_x: bool, base_offset: 
                     }));
                     offset += 1;
                 }
-            } else if !is_same {
-                if offset + 1 < coords.len() {
-                    let val = i16::from_be_bytes([coords[offset], coords[offset + 1]]);
-                    fields.push(json!({
-                        "type": "int16",
-                        "value": val,
-                        "offset": base_offset + offset as u32,
-                        "length": 2
-                    }));
-                    offset += 2;
-                }
+            } else if !is_same && offset + 1 < coords.len() {
+                let val = i16::from_be_bytes([coords[offset], coords[offset + 1]]);
+                fields.push(json!({
+                    "type": "int16",
+                    "value": val,
+                    "offset": base_offset + offset as u32,
+                    "length": 2
+                }));
+                offset += 2;
             }
         }
     }

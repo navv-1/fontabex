@@ -165,6 +165,9 @@ fn parse_lazy_batch(
         "parse_glyf_batch" => {
             parser::glyf::parse_batch(&font, offset, limit, search_target, search_query)
         }
+        "parse_gvar_batch" => {
+            parser::gvar::parse_batch(&font, offset, limit, search_target, search_query)
+        }
         _ => Err(format!("Unknown lazy command: {}", command)),
     }
 }
@@ -184,6 +187,9 @@ fn search_parsed_index(
     match command.as_str() {
         "parse_glyf_batch" => {
             parser::glyf::search_index(&font, offset, search_target, search_query, forward)
+        }
+        "parse_gvar_batch" => {
+            parser::gvar::search_index(&font, offset, search_target, search_query, forward)
         }
         _ => Err(format!("Unknown lazy command: {}", command)),
     }

@@ -21,7 +21,7 @@ export function getParsedRawValue(value: unknown) {
   return isParsedField(value) ? value.value : value;
 }
 
-function isRecordArray(value: unknown[]) {
+export function isRecordArray(value: unknown[]) {
   return value.every((item) => {
     const rawItem = getParsedRawValue(item);
     return (
