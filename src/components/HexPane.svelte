@@ -194,7 +194,7 @@
               onclick={() => (dropdownOpen = false)}
             ></div>
             <div class="custom-options">
-              {#each Array.from( { length: Math.ceil(rawBytes.length / PAGE_SIZE) }, ) as _, i}
+              {#each { length: Math.ceil(rawBytes.length / PAGE_SIZE) } as _, i}
                 <button
                   class="custom-option {currentPage === i ? 'selected' : ''}"
                   onclick={() => {
