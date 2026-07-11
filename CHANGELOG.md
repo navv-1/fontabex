@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.5.0 - 2026-07-11
+
+### Added
+
+- Added structured parsers for the `CFF `, `CFF2`, and `VORG` tables.
+- Added pagination to the hex pane for navigating very large table byte ranges.
+- Made the parsed data pane index column entries clickable links that navigate to the referenced item.
+
+### Changed
+
+- Improved byte-range highlighting when multiple parsed fields share the same offset and length by tracking object references.
+
 ## 0.4.0 - 2026-07-05
 
 ### Added
