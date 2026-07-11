@@ -26,6 +26,7 @@ pub mod table_directory;
 pub mod variations;
 pub mod vhea;
 pub mod vmtx;
+pub mod vorg;
 pub mod vvar;
 
 #[tauri::command]
@@ -57,6 +58,7 @@ pub fn parse_specific_table(path: String, tag: String) -> Result<Value, String> 
         "cvar" => cvar::parse(&font),
         "CFF " => cff::parse(&font),
         "CFF2" => cff2::parse(&font),
+        "VORG" => vorg::parse(&font),
         _ => Err(format!(
             "Parsing for table '{}' is not implemented yet.",
             tag
