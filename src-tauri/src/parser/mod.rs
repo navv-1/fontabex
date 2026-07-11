@@ -2,6 +2,9 @@ use read_fonts::FontRef;
 use serde_json::Value;
 
 pub mod avar;
+pub mod cff;
+pub mod cff2;
+pub mod cff_common;
 pub mod cmap;
 pub mod cvar;
 pub mod fvar;
@@ -52,6 +55,8 @@ pub fn parse_specific_table(path: String, tag: String) -> Result<Value, String> 
         "glyf" => glyf::parse(&font),
         "gvar" => gvar::parse(&font),
         "cvar" => cvar::parse(&font),
+        "CFF " => cff::parse(&font),
+        "CFF2" => cff2::parse(&font),
         _ => Err(format!(
             "Parsing for table '{}' is not implemented yet.",
             tag

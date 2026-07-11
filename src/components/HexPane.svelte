@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { tick } from "svelte";
+  import { tick, untrack } from "svelte";
   import { formatBytes } from "../lib/fontTables";
   import VirtualList from "./VirtualList.svelte";
 
@@ -26,16 +26,41 @@
   let virtualListRef = $state<any>(null);
 
   let bytesPerRow = $derived.by(() => {
-    if (hexPaneWidth >= 1840) return 32;
-    if (hexPaneWidth >= 1000) return 16;
-    if (hexPaneWidth >= 560) return 8;
-    return 4;
+    let bpr = 4;
+    if (hexPaneWidth >= 1840) bpr = 32;
+    else if (hexPaneWidth >= 1000) bpr = 16;
+    else if (hexPaneWidth >= 560) bpr = 8;
+    return bpr;
   });
 
+  const PAGE_SIZE = 1024 * 1024;
+  let currentPage = $state(0);
+  let dropdownOpen = $state(false);
+
+  $effect(() => {
+    if (rawBytes) {
+      const maxPage = Math.max(0, Math.ceil(rawBytes.length / PAGE_SIZE) - 1);
+      if (currentPage > maxPage) {
+        currentPage = maxPage;
+      }
+    } else {
+      currentPage = 0;
+    }
+  });
+
+  let pageStart = $derived(currentPage * PAGE_SIZE);
+  let pageBytes = $derived(
+    rawBytes ? rawBytes.slice(pageStart, pageStart + PAGE_SIZE) : null,
+  );
+
+  let runWidthStyle = $derived(
+    `--hex-byte-run-width: calc(${bytesPerRow * 22}px + ${(bytesPerRow - 1) * 0.25}rem + ${Math.max(0, bytesPerRow / 4 - 1) * 0.2}rem + 0.5rem);`,
+  );
+
   let hexRows = $derived.by(() => {
-    if (!rawBytes) return { length: 0, slice: () => [] };
+    if (!pageBytes) return { length: 0, slice: () => [] };
     const rowSize = bytesPerRow;
-    const length = Math.ceil(rawBytes.length / rowSize);
+    const length = Math.ceil(pageBytes.length / rowSize);
     return {
       length,
       slice(start: number, end: number) {
@@ -43,8 +68,8 @@
         for (let i = start; i < end && i < length; i++) {
           const offset = i * rowSize;
           rows.push({
-            offset,
-            bytes: rawBytes.slice(offset, offset + rowSize),
+            offset: pageStart + offset,
+            bytes: pageBytes.slice(offset, offset + rowSize),
           });
         }
         return rows;
@@ -57,14 +82,28 @@
   }
 
   $effect(() => {
-    if (!selectedByteRange || bytesPerRow <= 0 || hexRows.length === 0) return;
-    scrollToByteOffset(selectedByteRange.offset);
+    const range = selectedByteRange;
+    const bpr = bytesPerRow;
+    const vlist = virtualListRef;
+
+    if (!range || bpr <= 0 || !vlist) return;
+
+    untrack(() => {
+      if (hexRows.length > 0) {
+        scrollToByteOffset(range.offset);
+      }
+    });
   });
 
   async function scrollToByteOffset(offset: number) {
     if (virtualListRef && bytesPerRow > 0) {
+      const targetPage = Math.floor(offset / PAGE_SIZE);
+      if (currentPage !== targetPage) {
+        currentPage = targetPage;
+      }
       await tick();
-      const rowIndex = Math.floor(offset / bytesPerRow);
+      const offsetInPage = offset - currentPage * PAGE_SIZE;
+      const rowIndex = Math.floor(offsetInPage / bytesPerRow);
       virtualListRef.scrollToIndex(rowIndex, "auto", "nearest");
     }
   }
@@ -104,6 +143,95 @@
     </span>
   </div>
 
+  {#if rawBytes && rawBytes.length > PAGE_SIZE}
+    <div class="pagination-container">
+      <div class="pagination-controls">
+        <button
+          class="icon-btn"
+          aria-label="Previous Page"
+          title="Previous Page"
+          disabled={currentPage === 0}
+          onclick={() => currentPage--}
+        >
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <polyline points="15 18 9 12 15 6"></polyline>
+          </svg>
+        </button>
+        <div class="custom-select-container">
+          <button
+            class="custom-select-button"
+            onclick={() => (dropdownOpen = !dropdownOpen)}
+          >
+            {formatHexOffset(currentPage * PAGE_SIZE)}
+            <svg
+              width="12"
+              height="12"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+          </button>
+
+          {#if dropdownOpen}
+            <!-- svelte-ignore a11y_click_events_have_key_events -->
+            <!-- svelte-ignore a11y_no_static_element_interactions -->
+            <div
+              class="dropdown-overlay"
+              onclick={() => (dropdownOpen = false)}
+            ></div>
+            <div class="custom-options">
+              {#each Array.from( { length: Math.ceil(rawBytes.length / PAGE_SIZE) }, ) as _, i}
+                <button
+                  class="custom-option {currentPage === i ? 'selected' : ''}"
+                  onclick={() => {
+                    currentPage = i;
+                    dropdownOpen = false;
+                  }}
+                >
+                  {formatHexOffset(i * PAGE_SIZE)}
+                </button>
+              {/each}
+            </div>
+          {/if}
+        </div>
+        <button
+          class="icon-btn"
+          aria-label="Next Page"
+          title="Next Page"
+          disabled={currentPage >= Math.ceil(rawBytes.length / PAGE_SIZE) - 1}
+          onclick={() => currentPage++}
+        >
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <polyline points="9 18 15 12 9 6"></polyline>
+          </svg>
+        </button>
+      </div>
+    </div>
+  {/if}
+
   {#if dataLoading}
     <div class="loading-progress-stripe"></div>
   {/if}
@@ -118,7 +246,7 @@
             itemHeight={24}
           >
             {#snippet children(row: HexRow)}
-              <div class="hex-row hex-cols-{bytesPerRow}">
+              <div class="hex-row" style={runWidthStyle}>
                 <span class="hex-col-divider offset-col row-offset">
                   {formatHexOffset(row.offset)}
                 </span>
@@ -213,7 +341,7 @@
   }
 
   .pane-header {
-    padding: 0.4rem 0.75rem;
+    padding: 0.4rem 0.6rem;
     border-bottom: 1px solid var(--border-color);
     font-size: 0.875rem;
     font-weight: 600;
@@ -276,22 +404,6 @@
     font-variant-numeric: tabular-nums;
   }
 
-  .hex-cols-4 {
-    --hex-byte-run-width: calc(88px + 0.75rem + 0.5rem);
-  }
-
-  .hex-cols-8 {
-    --hex-byte-run-width: calc(176px + 1.75rem + 0.2rem + 0.5rem);
-  }
-
-  .hex-cols-16 {
-    --hex-byte-run-width: calc(352px + 3.75rem + 0.6rem + 0.5rem);
-  }
-
-  .hex-cols-32 {
-    --hex-byte-run-width: calc(704px + 7.75rem + 1.4rem + 0.5rem);
-  }
-
   .hex-col-divider {
     border-right: 1px solid
       color-mix(in srgb, var(--border-color) 60%, transparent);
@@ -322,11 +434,6 @@
 
   .hex-ascii-col.row-ascii {
     color: color-mix(in srgb, var(--text-color) 70%, transparent);
-  }
-
-  .hex-loading {
-    padding: 1rem;
-    opacity: 0.5;
   }
 
   .hex-row:hover {
@@ -376,10 +483,6 @@
   }
 
   @container (max-width: 340px) {
-    .pane-header {
-      padding-inline: 0.6rem;
-    }
-
     .hex-row {
       grid-template-columns: 4rem max-content max-content;
       column-gap: 0.5rem;
@@ -402,5 +505,116 @@
     border-radius: 10px;
     font-weight: 400;
     color: color-mix(in srgb, var(--text-color) 70%, transparent);
+  }
+
+  .pagination-container {
+    display: flex;
+    justify-content: center;
+    padding: 0.4rem 0.6rem;
+    border-bottom: 1px solid var(--border-color);
+    background: var(--sidebar-bg);
+    flex-shrink: 0;
+  }
+
+  .pagination-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+  }
+
+  .icon-btn {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    color: color-mix(in srgb, var(--text-color) 70%, transparent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.2rem;
+    border-radius: 4px;
+  }
+
+  .icon-btn:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--text-color) 10%, transparent);
+    color: var(--text-color);
+  }
+
+  .icon-btn:disabled {
+    opacity: 0.3;
+    cursor: default;
+  }
+
+  .custom-select-container {
+    position: relative;
+  }
+
+  .custom-select-button {
+    background: var(--sidebar-bg);
+    border: 1px solid var(--border-color);
+    color: var(--text-color);
+    border-radius: 4px;
+    padding: 0.2rem 0.4rem;
+    font-size: 0.75rem;
+    font-family: "JetBrains Mono", "Fira Code", ui-monospace, monospace;
+    cursor: pointer;
+    outline: none;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+  }
+
+  .custom-select-button:hover {
+    border-color: color-mix(
+      in srgb,
+      var(--border-color) 80%,
+      var(--text-color)
+    );
+  }
+
+  .dropdown-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 99;
+  }
+
+  .custom-options {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--sidebar-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    min-width: 100%;
+  }
+
+  .custom-option {
+    background: transparent;
+    border: none;
+    color: var(--text-color);
+    padding: 0.4rem 0.6rem;
+    font-size: 0.75rem;
+    font-family: "JetBrains Mono", "Fira Code", ui-monospace, monospace;
+    cursor: pointer;
+    text-align: center;
+    width: 100%;
+  }
+
+  .custom-option:hover {
+    background: color-mix(in srgb, var(--text-color) 5%, transparent);
+  }
+
+  .custom-option.selected {
+    background: var(--primary);
+    color: #ffffff;
   }
 </style>

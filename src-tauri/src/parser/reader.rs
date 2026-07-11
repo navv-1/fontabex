@@ -62,7 +62,7 @@ pub fn read_u16_at(bytes: &[u8], offset: usize) -> u16 {
 }
 
 pub fn parsed_field<T: Serialize>(
-    data_type: &'static str,
+    data_type: &str,
     value: T,
     offset: usize,
     length: usize,

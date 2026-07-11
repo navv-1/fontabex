@@ -142,9 +142,11 @@
 
   let showSidebar = $state(getStoredBoolean(storedUiState.showSidebar, true));
   let showHexPane = $state(getStoredBoolean(storedUiState.showHexPane, false));
-  let selectedByteRange = $state<{ offset: number; length: number } | null>(
-    null,
-  );
+  let selectedByteRange = $state<{
+    offset: number;
+    length: number;
+    itemRef: any;
+  } | null>(null);
 
   const MIN_SIDEBAR = 320;
   const MIN_HEX = 320;
@@ -711,7 +713,7 @@
       let rowIndex = isWrappedLazy
         ? item.rowIndex
         : (item.rowIndex ?? arrayIndex);
-      return { row, rowIndex };
+      return { row, rowIndex, originalItem: actualItem };
     });
   });
 
@@ -1069,9 +1071,11 @@
   }
 
   function isSelectedParsedField(value: any) {
+    if (!isParsedField(value) || selectedByteRange === null) return false;
+    if (selectedByteRange.itemRef !== undefined) {
+      return value === selectedByteRange.itemRef;
+    }
     return (
-      isParsedField(value) &&
-      selectedByteRange !== null &&
       value.offset === selectedByteRange.offset &&
       value.length === selectedByteRange.length
     );
@@ -1088,7 +1092,7 @@
 
   function selectParsedFieldBytes(value: any) {
     if (isParsedField(value)) {
-      handleSelectBytes(value.offset, value.length);
+      handleSelectBytes(value.offset, value.length, value);
     }
   }
 
@@ -1123,8 +1127,8 @@
     }
   }
 
-  function handleSelectBytes(offset: number, length: number) {
-    selectedByteRange = { offset, length };
+  function handleSelectBytes(offset: number, length: number, itemRef: any) {
+    selectedByteRange = { offset, length, itemRef };
     hexPaneRef?.scrollToOffset(offset);
   }
 </script>
@@ -1556,7 +1560,23 @@
                               : ''}"
                             role="cell"
                           >
-                            {rowIndex}
+                            {#if item.originalItem}
+                              <button
+                                class="value-link"
+                                type="button"
+                                onclick={(event) => {
+                                  event.stopPropagation();
+                                  handleParsedCellLink(
+                                    String(rowIndex),
+                                    item.originalItem,
+                                  );
+                                }}
+                              >
+                                {rowIndex}
+                              </button>
+                            {:else}
+                              {rowIndex}
+                            {/if}
                           </div>
                           {#if row._dummy}
                             <div
