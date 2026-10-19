@@ -22,18 +22,18 @@
   "license": "GPL-3.0-only",
   "dependencies": {
     "@tauri-apps/api": "^2",
-    "@tauri-apps/plugin-dialog": "^2.7.3",
+    "@tauri-apps/plugin-dialog": "^2.8.3",
     "@tauri-apps/plugin-opener": "^2"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^7.3.1",
     "@tauri-apps/cli": "^2",
-    "@types/node": "^26.6.2",
-    "prettier": "^3.9.9",
+    "@types/node": "^26.6.5",
+    "prettier": "^3.9.10",
     "prettier-plugin-svelte": "^4.1.1",
-    "svelte": "^5.57.1",
+    "svelte": "^5.57.2",
     "svelte-check": "^4.7.6",
     "typescript": "~6.0.3",
-    "vite": "^8.3.1"
+    "vite": "^8.3.4"
   }
 }
